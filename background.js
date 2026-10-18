@@ -1,5 +1,3 @@
-const DASHBOARD = 'dashboard.html';
-
 async function ensureOffscreen() {
   const contexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
   if (!contexts.length) {
@@ -11,20 +9,8 @@ async function ensureOffscreen() {
   }
 }
 
-async function dashboardTab() {
-  const url = chrome.runtime.getURL(DASHBOARD);
-  const tabs = await chrome.tabs.query({ url });
-  if (tabs.length) {
-    await chrome.tabs.update(tabs[0].id, { active: true });
-    await chrome.windows.update(tabs[0].windowId, { focused: true });
-  } else {
-    await chrome.tabs.create({ url });
-  }
-}
-
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
-  chrome.contextMenus.create({ id: 'open-dashboard', title: 'Abrir transcripción y ajustes', contexts: ['action'] });
   chrome.contextMenus.create({ id: 'stop-capture', title: 'Detener captura', contexts: ['action'] });
   });
 });
@@ -35,8 +21,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.target === 'background' && message.type === 'START_CAPTURE') {
-    chrome.storage.session.get('captureTabId').then(({ captureTabId }) => captureTabId && chrome.tabs.get(captureTabId))
-      .then((tab) => startCaptureForTab(tab))
+    chrome.tabs.get(message.tabId).then((tab) => startCaptureForTab(tab))
       .then(() => sendResponse({ ok: true }))
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
@@ -103,27 +88,5 @@ async function startCaptureForTab(tab) {
 }
 
 chrome.contextMenus.onClicked.addListener((info) => {
-  if (info.menuItemId === 'open-dashboard') dashboardTab();
   if (info.menuItemId === 'stop-capture') stopActiveCapture();
-});
-
-chrome.action.onClicked.addListener(async (tab) => {
-  const contexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
-  if (contexts.length) {
-    try {
-      const state = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'GET_CAPTURE_STATE' });
-      if (state?.capturing) {
-        await stopActiveCapture();
-        return;
-      }
-    } catch { /* Un documento obsoleto no bloquea una nueva captura. */ }
-  }
-  try {
-    await startCaptureForTab(tab);
-  } catch (error) {
-    await chrome.storage.session.set({ capturing: false, lastError: error.message });
-    await chrome.action.setTitle({ title: 'Iniciar transcripción' });
-    await chrome.action.setBadgeText({ text: '' });
-    await dashboardTab();
-  }
 });

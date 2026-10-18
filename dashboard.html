@@ -1,18 +1,51 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Transcripción local</title><link rel="stylesheet" href="dashboard.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VoiceOps · Transcripción</title>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
   <main>
-    <header><div class="eyebrow">OLLAMA · LOCAL</div><h1>Transcripción</h1><p id="status" role="status">Captura detenida</p></header>
-    <section class="controls"><button id="preload" class="primary">Cargar modelo</button><button id="capture-toggle" class="primary">Comenzar captura</button><button id="clear" class="secondary">Borrar texto</button></section>
-    <label for="model">Modelos instalados en Ollama</label>
-    <div class="model-row"><select id="model"><option value="">Cargando lista…</option></select><button id="refresh-models" class="secondary">Actualizar</button></div>
-    <p class="hint">Usa el icono en la pestaña de la llamada para iniciarla. Puedes detener y reiniciar desde este botón. La captura continúa aunque cierres esta página.</p>
-    <label for="transcript">Conversación</label><textarea id="transcript" placeholder="La transcripción aparecerá aquí…" spellcheck="false"></textarea>
-    <footer>El audio se procesa localmente y no se guarda como grabación.</footer>
+    <header class="topbar">
+      <div class="header-actions">
+        <button id="clear" class="icon-button" type="button" title="Limpiar sesión" aria-label="Limpiar sesión"><span class="material-symbols-outlined">delete_sweep</span></button>
+        <button id="preload" class="outline-button header-button" type="button">Cargar modelo</button>
+      </div>
+    </header>
+
+    <section class="panel transcript-panel">
+      <div class="section-heading">
+        <h2><span class="material-symbols-outlined">record_voice_over</span> Transcripción</h2>
+        <div class="heading-actions">
+          <button class="text-button icon-action" type="button" data-copy="transcript" title="Copiar transcripción" aria-label="Copiar transcripción"><span class="material-symbols-outlined">content_copy</span></button>
+          <button id="capture-toggle" class="record-button" type="button"><span class="record-dot"></span><span>Comenzar captura</span></button>
+        </div>
+      </div>
+      <textarea id="transcript" placeholder="El audio de la pestaña aparecerá aquí…" spellcheck="false" aria-label="Transcripción del cliente"></textarea>
+      <div class="model-row">
+        <label for="model">Modelo STT</label>
+        <select id="model"><option value="">Cargando modelos…</option></select>
+      </div>
+    </section>
+    <section class="panel summary-panel">
+      <div class="section-heading">
+        <h2><span class="material-symbols-outlined">psychology</span> Resumen</h2>
+        <div class="summary-actions">
+          <button class="text-button icon-action" type="button" data-copy="summary" title="Copiar resumen" aria-label="Copiar resumen"><span class="material-symbols-outlined">content_copy</span></button>
+          <button id="summarize" class="generate-button" type="button"><span class="material-symbols-outlined">wand_stars</span> Generar resumen</button>
+        </div>
+      </div>
+      <textarea id="summary" class="summary" placeholder="Genera un resumen con motivo, síntomas, errores y pasos ya probados…" spellcheck="false" aria-label="Resumen de la llamada"></textarea>
+      <div class="model-row summary-model-row">
+        <label for="summary-model">Modelo LLM</label>
+        <select id="summary-model"><option value="">Cargando modelos…</option></select>
+      </div>
+    </section>
+    <p id="status" class="status-message" role="status" aria-live="polite" hidden></p>
+
   </main>
   <script src="dashboard.js"></script>
 </body>
