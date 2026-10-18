@@ -27,8 +27,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.target === 'background' && message.type === 'GET_SETTINGS') {
-    chrome.storage.local.get(['model', 'transcript']).then(({ transcript = '', model }) => {
-      sendResponse({ transcript, model: model || 'frozenlab/qwen3-asr:0.6b' });
+    chrome.storage.local.get('model').then(({ model }) => {
+      sendResponse({ model: model || 'frozenlab/qwen3-asr:0.6b' });
     });
     return true;
   }

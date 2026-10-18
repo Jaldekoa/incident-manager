@@ -7,6 +7,12 @@ let captureGeneration = 0;
 let activeRequest;
 let transcriptQueue = Promise.resolve();
 
+function enqueueCaptureOperation(operation) {
+  const result = captureControl.then(operation, operation);
+  captureControl = result.catch(() => {});
+  return result;
+}
+
 function report(message) {
   return chrome.runtime.sendMessage({ target: 'background', ...message });
 }
@@ -139,21 +145,17 @@ async function stopCapture(updateState = true) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.target !== 'offscreen') return;
-  if (message.type === 'GET_CAPTURE_STATE') {
-    sendResponse({ capturing: Boolean(tabStream && processorNode) });
-    return;
-  }
   if (message.type === 'START_CAPTURE') {
-    captureControl = captureControl.then(() => startCapture(message.streamId));
-    captureControl.then(() => sendResponse({ ok: true })).catch(async (error) => {
-      await report({ type: 'CAPTURE_STATE', capturing: false, error: error.message });
-      sendResponse({ ok: false, error: error.message });
-    });
+    enqueueCaptureOperation(() => startCapture(message.streamId))
+      .then(() => sendResponse({ ok: true })).catch(async (error) => {
+        await report({ type: 'CAPTURE_STATE', capturing: false, error: error.message });
+        sendResponse({ ok: false, error: error.message });
+      });
     return true;
   }
   if (message.type === 'STOP_CAPTURE') {
-    captureControl = captureControl.then(() => stopCapture());
-    captureControl.then(() => sendResponse({ ok: true })).catch((error) => sendResponse({ ok: false, error: error.message }));
+    enqueueCaptureOperation(() => stopCapture())
+      .then(() => sendResponse({ ok: true })).catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   }
   if (message.type === 'PRELOAD_MODEL') {
