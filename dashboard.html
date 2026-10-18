@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Transcripción local</title><link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <main>
+    <header><div class="eyebrow">OLLAMA · LOCAL</div><h1>Transcripción</h1><p id="status" role="status">Captura detenida</p></header>
+    <section class="controls"><button id="preload" class="primary">Cargar modelo</button><button id="capture-toggle" class="primary">Comenzar captura</button><button id="clear" class="secondary">Borrar texto</button></section>
+    <label for="model">Modelos instalados en Ollama</label>
+    <div class="model-row"><select id="model"><option value="">Cargando lista…</option></select><button id="refresh-models" class="secondary">Actualizar</button></div>
+    <p class="hint">Usa el icono en la pestaña de la llamada para iniciarla. Puedes detener y reiniciar desde este botón. La captura continúa aunque cierres esta página.</p>
+    <label for="transcript">Conversación</label><textarea id="transcript" placeholder="La transcripción aparecerá aquí…" spellcheck="false"></textarea>
+    <footer>El audio se procesa localmente y no se guarda como grabación.</footer>
+  </main>
+  <script src="dashboard.js"></script>
+</body>
+</html>

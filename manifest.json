@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "minimum_chrome_version": "116",
+  "name": "Transcripción local de llamadas",
+  "version": "0.1.0",
+  "description": "Transcribe en español el audio de una pestaña con Ollama local.",
+  "permissions": ["tabCapture", "activeTab", "storage", "offscreen", "contextMenus"],
+  "host_permissions": ["http://localhost:11434/*", "http://127.0.0.1:11434/*"],
+  "action": { "default_title": "Iniciar transcripción" },
+  "background": { "service_worker": "background.js" }
+}
