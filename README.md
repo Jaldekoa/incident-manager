@@ -86,12 +86,22 @@ Pulsa **Generar resumen** cuando quieras resumir la conversación. Gracias a las
 
 ## Categoría
 
-Con el resumen generado, pulsa **Categorizar** para clasificar la incidencia en el árbol de `src/shared/categories.ts`. Se usa el modelo decisional Tev1 a través del endpoint `/v1/systemone` de Ollama y se elige la categoría final con **mayor probabilidad conjunta**: P(área) × P(subgrupo | área) × … × P(categoría | padre). Para ello se hace una pregunta por cada nodo con varias opciones y se recorre el árbol completo, de modo que un área algo menos probable puede ganar si contiene una categoría claramente más probable. Los nodos con una sola opción no se consultan.
+Con el resumen generado, pulsa **Categorizar** para clasificar la incidencia en el árbol de categorías. Se usa el modelo decisional Tev1 a través del endpoint `/v1/systemone` de Ollama y se elige la categoría final con **mayor probabilidad conjunta**: P(área) × P(subgrupo | área) × … × P(categoría | padre). Para ello se hace una pregunta por cada nodo con varias opciones y se recorre el árbol completo, de modo que un área algo menos probable puede ganar si contiene una categoría claramente más probable. Los nodos con una sola opción no se consultan.
 
 El algoritmo escala con el árbol: los nodos con más de 24 opciones se dividen en bloques (con una opción "ninguna de las anteriores") que luego se renormalizan juntos, y las preguntas se reparten en varias peticiones si superan los límites de la API (64 preguntas o 64 KiB por petición).
 
 El resultado aparece en un selector jerárquico, deshabilitado hasta la primera categorización. Al abrirlo se ve el árbol completo: las ramas se despliegan con ▶, la rama elegida aparece abierta y cada opción evaluada por el modelo muestra a la derecha su probabilidad conjunta (las que no pasan por el modelo, sin porcentaje). Puedes elegir otra categoría a mano, y el botón de copiar copia la ruta seleccionada. Al pasar el cursor sobre una categoría se muestra su descripción.
 
-Para cambiar las categorías, edita `src/shared/categories.ts` y vuelve a hacer el build: cada nodo lleva una `descripcion_global` y el resto de sus claves son hijos; un hijo de tipo texto es una categoría final con su descripción. El árbol puede tener cualquier profundidad y cualquier número de opciones por nodo.
+### Editar las categorías
+
+En **Configuración › Categoría** está el editor del árbol:
+
+- **▶ / ▼** despliega o pliega una rama.
+- **Arrastrar y soltar** (desde cualquier punto de la fila) mueve una categoría: según dónde la sueltes sobre otra fila queda **antes** (parte superior, línea azul arriba), **dentro** (centro, fondo azul) o **después** (parte inferior, línea azul abajo). Funciona dentro del mismo nivel y entre niveles; no se puede soltar una categoría dentro de sí misma.
+- **↑ / ↓** sube o baja una categoría entre sus hermanas, **＋** añade una subcategoría y **🗑** la elimina junto con sus subcategorías.
+- **Clic en el nombre** abre su nombre y su descripción para editarlos. La descripción es lo que usa el modelo decisional para elegir, así que conviene que sea clara.
+- **Añadir área** crea una categoría de primer nivel y **Restaurar por defecto** recupera el árbol original.
+
+Una categoría sin subcategorías es una categoría final. Los cambios se aplican al pulsar **Guardar**, que comprueba que no haya nombres vacíos ni repetidos entre hermanas; si vuelves atrás sin guardar, se descartan. El árbol por defecto está definido en `src/shared/categories.ts`.
 
 La transcripción, el resumen y la categorización se procesan en `http://127.0.0.1:11434`; no se envían a servicios externos.

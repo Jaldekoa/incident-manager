@@ -1,4 +1,5 @@
 import type { CategoryResult } from '../categorize/categorize';
+import type { CategoryTree } from './categories';
 import type { Speaker } from './settings';
 
 /** Todo lo que la extensión guarda en `chrome.storage.local` (persistente). */
@@ -6,6 +7,8 @@ export interface LocalState {
   transcript: string;
   summary: string;
   category: CategoryResult | null;
+  /** Árbol de categorías editado por el usuario; `null`/ausente = árbol por defecto. */
+  categories: CategoryTree | null;
   lastSegments: Partial<Record<Speaker, string>>;
   lastSpeaker: Speaker | '';
   model: string;

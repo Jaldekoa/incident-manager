@@ -1,8 +1,10 @@
 import type { CategoryResult } from '../../categorize/categorize';
+import type { CategoryTree as Categories } from '../../shared/categories';
 import { CategoryTree } from './CategoryTree';
 import { CopyButton, Icon } from './Icon';
 
 interface Props {
+  categories: Categories;
   category: CategoryResult | null;
   busy: boolean;
   onCategorize: () => void;
@@ -10,7 +12,7 @@ interface Props {
   onCopy: () => void;
 }
 
-export function CategoryPanel({ category, busy, onCategorize, onSelect, onCopy }: Props) {
+export function CategoryPanel({ categories, category, busy, onCategorize, onSelect, onCopy }: Props) {
   return (
     <section className="panel">
       <div className="section-heading">
@@ -22,7 +24,7 @@ export function CategoryPanel({ category, busy, onCategorize, onSelect, onCopy }
           </button>
         </div>
       </div>
-      <CategoryTree category={category} onSelect={onSelect} />
+      <CategoryTree categories={categories} category={category} onSelect={onSelect} />
     </section>
   );
 }

@@ -53,7 +53,7 @@ h2 .material-symbols-outlined { font-size: 16px; }
 .generate-button .material-symbols-outlined { font-size: 14px; }
 textarea { display: block; width: 100%; height: 118px; min-height: 75px; resize: vertical; border: 1px solid var(--ink); border-radius: 0; padding: 8px; background: #fff; color: var(--ink); font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
 textarea::placeholder { color: #9ca3af; }
-textarea:focus, select:focus { outline: 1px solid var(--blue); outline-offset: 0; }
+textarea:focus, select:focus, input:focus { outline: 1px solid var(--blue); outline-offset: 0; }
 .summary { height: 104px; min-height: 70px; }
 .tree-select { border: 1px solid var(--ink); background: #fff; color: var(--ink); font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .tree-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 34px; padding: 6px 8px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
@@ -72,6 +72,32 @@ textarea:focus, select:focus { outline: 1px solid var(--blue); outline-offset: 0
 .tree-name { flex: 1; min-width: 0; }
 .tree-score { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
 .tree-leaf.selected .tree-score { color: #fff; }
+.field-hint { margin: 0; color: var(--muted); font: 10px/1.4 ui-monospace, monospace; }
+.category-editor { border: 1px solid var(--ink); background: #fff; color: var(--ink); font: 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.category-editor ul { margin: 0; padding: 0 0 0 14px; list-style: none; }
+.category-editor .cat-list { max-height: 280px; overflow-y: auto; padding: 4px 0; }
+.cat-row { display: flex; align-items: center; gap: 2px; padding: 1px 4px; border-block: 2px solid transparent; }
+.cat-row:hover, .cat-row.editing { background: #f3f4f6; }
+.cat-row.dragging { opacity: .4; }
+.cat-row.drop-before { border-top-color: var(--blue); }
+.cat-row.drop-after { border-bottom-color: var(--blue); }
+.cat-row.drop-inside { background: #dbeafe; outline: 1px dashed var(--blue); outline-offset: -1px; }
+.cat-handle.material-symbols-outlined { flex: 0 0 auto; font-size: 16px; color: var(--muted); cursor: grab; }
+.cat-toggle { flex: 0 0 14px; width: 14px; padding: 0; border: 0; background: transparent; color: inherit; font-size: 8px; }
+.cat-name { flex: 1; min-width: 0; overflow: hidden; padding: 2px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.cat-name:hover { text-decoration: underline; }
+.cat-action { display: grid; flex: 0 0 auto; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 2px; background: transparent; color: var(--ink); }
+.cat-action .material-symbols-outlined { font-size: 15px; }
+.cat-action:hover { background: #e5e7eb; }
+.cat-action.danger:hover { color: #dc2626; }
+.cat-action:disabled { cursor: default; opacity: .25; background: transparent; }
+.cat-edit { display: grid; gap: 6px; margin: 2px 4px 6px 34px; padding: 6px; border: 1px solid var(--line); background: #fafafa; }
+.cat-edit label { display: grid; gap: 3px; color: var(--muted); font-size: 10px; }
+.cat-edit input { height: 27px; padding: 3px 6px; border: 1px solid var(--ink); border-radius: 2px; background: #fff; color: var(--ink); font: 11px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.cat-edit textarea { height: 64px; min-height: 40px; }
+.cat-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px; border-top: 1px solid var(--line); }
+.cat-add { display: inline-flex; align-items: center; gap: 4px; }
+.cat-empty { margin: 0; padding: 8px; color: #9ca3af; }
 .field { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin-top: 8px; }
 .field label { color: var(--muted); font: 10px/1.2 ui-monospace, monospace; }
 select { width: 100%; min-width: 0; height: 27px; padding: 3px 23px 3px 6px; border: 1px solid var(--ink); border-radius: 2px; background: #fff; color: var(--ink); font: 10px/1.2 ui-monospace, monospace; }

@@ -5,6 +5,7 @@ import { getSession, setLocal } from '../../shared/storage';
 import { sendToBackground, type Broadcast } from '../../shared/messages';
 import { errorMessage } from '../../shared/errors';
 import { categorize } from '../../categorize/categorize';
+import { resolveCategories } from '../../shared/categories';
 import { useChromeStorage } from '../hooks/useChromeStorage';
 import type { SetStatus } from '../hooks/useStatus';
 import { IconButton } from '../components/Icon';
@@ -37,6 +38,8 @@ export function MainView({ hidden, setStatus, onOpenSettings }: Props) {
   const [transcript, setTranscript] = useEditableCopy(storedTranscript);
   const [summary, setSummary] = useEditableCopy(storedSummary);
   const category = validCategory(storedCategory);
+  const [storedCategories] = useChromeStorage('local', 'categories', null);
+  const categories = resolveCategories(storedCategories);
 
   const [busy, setBusy] = useState<Record<Action, boolean>>({ capture: false, summarize: false, categorize: false });
   const [preloading, setPreloading] = useState(false);
@@ -134,7 +137,7 @@ export function MainView({ hidden, setStatus, onOpenSettings }: Props) {
     if (!model) return setStatus('Elige un modelo decisional en Configuración.', true);
     await run('categorize', async () => {
       try {
-        const result = await categorize(model, text, (done, total) =>
+        const result = await categorize(model, text, categories, (done, total) =>
           setStatus(`Categorizando con ${model}…${total > 1 ? ` (${done}/${total})` : ''}`));
         await setStoredCategory(result);
         setStatus('Incidencia categorizada.');
@@ -174,6 +177,7 @@ export function MainView({ hidden, setStatus, onOpenSettings }: Props) {
         onCopy={() => copy(summary, 'Resumen copiado.')}
       />
       <CategoryPanel
+        categories={categories}
         category={category}
         busy={busy.categorize}
         onCategorize={categorizeSummary}

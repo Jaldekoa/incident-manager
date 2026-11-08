@@ -46,8 +46,16 @@ describe('createWindower', () => {
     let counter = 0;
     for (let chunk = 0; chunk < 20; chunk++) push(new Float32Array(500).map(() => counter++)); // 10 s de audio
     expect(windows.map((w) => w.length)).toEqual([4000, 4000, 4000]);
-    // Comportamiento heredado: el salto cuenta desde el inicio, así que la 2.ª ventana llega 2 s después de la 1.ª
-    // (solape de 2 s en vez de 1 s). Después sí va cada 3 s.
-    expect(windows.map((w) => [w[0], w[3999]])).toEqual([[0, 3999], [2000, 5999], [5000, 8999]]);
+    // 1 s de solape entre ventanas consecutivas.
+    expect(windows.map((w) => [w[0], w[3999]])).toEqual([[0, 3999], [3000, 6999], [6000, 9999]]);
+  });
+
+  it('mantiene el ritmo con bloques que no encajan con el salto (como los 2048 del worklet)', () => {
+    const windows: Float32Array[] = [];
+    const push = createWindower(1000, (samples) => windows.push(samples));
+    let counter = 0;
+    for (let chunk = 0; chunk < 10; chunk++) push(new Float32Array(1300).map(() => counter++)); // 13 s de audio
+    // Ventanas en el primer bloque que alcanza 4, 7, 10 y 13 s; cada una termina en la última muestra recibida.
+    expect(windows.map((w) => w[3999])).toEqual([5199, 7799, 10399, 12999]);
   });
 });

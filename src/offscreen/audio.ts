@@ -40,17 +40,16 @@ export function createWindower(sampleRate: number, onWindow: (samples: Float32Ar
   const strideSamples = Math.ceil(sampleRate * STRIDE_SECONDS);
   const ring = new Float32Array(windowSamples);
   let writeIndex = 0;
-  let buffered = 0;
-  let sinceWindow = 0;
+  // Empieza en negativo para que la primera ventana salga justo al llenarse (4 s) y las siguientes cada 3 s.
+  let sinceWindow = strideSamples - windowSamples;
   return (input) => {
     for (let i = 0; i < input.length; i++) {
       ring[writeIndex] = input[i];
       writeIndex = (writeIndex + 1) % windowSamples;
     }
-    buffered = Math.min(windowSamples, buffered + input.length);
     sinceWindow += input.length;
-    if (buffered < windowSamples || sinceWindow < strideSamples) return;
-    sinceWindow %= strideSamples;
+    if (sinceWindow < strideSamples) return;
+    sinceWindow -= strideSamples;
     const chronological = new Float32Array(windowSamples);
     chronological.set(ring.subarray(writeIndex), 0);
     chronological.set(ring.subarray(0, writeIndex), windowSamples - writeIndex);

@@ -3,18 +3,21 @@ import {
   DEFAULT_LANGUAGE, DEFAULT_SUMMARY_PROMPT, LANGUAGES, getSettings, isLanguage, pickModels,
   type Language, type ModelChoice
 } from '../../shared/settings';
-import { setLocal } from '../../shared/storage';
+import { getLocal, setLocal } from '../../shared/storage';
 import { errorMessage } from '../../shared/errors';
+import { normalizeCategories, resolveCategories, validateCategories, type CategoryTree } from '../../shared/categories';
 import type { InstalledModels } from '../hooks/useInstalledModels';
 import type { SetStatus } from '../hooks/useStatus';
 import { Icon, IconButton } from '../components/Icon';
+import { CategoryEditor } from '../components/CategoryEditor';
 
 interface Form extends ModelChoice {
   language: Language;
   summaryPrompt: string;
+  categories: CategoryTree;
 }
 
-const EMPTY_FORM: Form = { model: '', summaryModel: '', categoryModel: '', language: DEFAULT_LANGUAGE, summaryPrompt: '' };
+const EMPTY_FORM: Form = { model: '', summaryModel: '', categoryModel: '', language: DEFAULT_LANGUAGE, summaryPrompt: '', categories: [] };
 
 interface Props {
   visible: boolean;
@@ -44,8 +47,11 @@ export function SettingsView({ visible, models, setStatus, onClose }: Props) {
   const update = <K extends keyof Form>(key: K) => (value: Form[K]) => setForm((current) => ({ ...current, [key]: value }));
 
   const load = useCallback(async () => {
-    const { model, summaryModel, categoryModel, language, summaryPrompt } = await getSettings();
-    setForm({ model, summaryModel, categoryModel, language, summaryPrompt });
+    const [{ model, summaryModel, categoryModel, language, summaryPrompt }, { categories }] = await Promise.all([
+      getSettings(),
+      getLocal(['categories'])
+    ]);
+    setForm({ model, summaryModel, categoryModel, language, summaryPrompt, categories: resolveCategories(categories) });
   }, []);
 
   // Al abrir la configuración se recargan los valores guardados (se descartan cambios sin guardar).
@@ -54,9 +60,16 @@ export function SettingsView({ visible, models, setStatus, onClose }: Props) {
   }, [visible, load]);
 
   const save = async () => {
+    const problem = validateCategories(shown.categories);
+    if (problem) return setStatus(`No se guardó: ${problem}`, true);
     try {
-      const { model, summaryModel, categoryModel, language, summaryPrompt } = shown;
-      await setLocal({ language, summaryPrompt: summaryPrompt.trim(), ...(installed && { model, summaryModel, categoryModel }) });
+      const { model, summaryModel, categoryModel, language, summaryPrompt, categories } = shown;
+      await setLocal({
+        language,
+        summaryPrompt: summaryPrompt.trim(),
+        categories: normalizeCategories(categories),
+        ...(installed && { model, summaryModel, categoryModel })
+      });
       await load(); // un prompt vacío vuelve al valor por defecto
       setStatus('Configuración guardada.');
     } catch (error) {
@@ -117,6 +130,11 @@ export function SettingsView({ visible, models, setStatus, onClose }: Props) {
           <h2><Icon name="category" /> Categoría</h2>
         </div>
         <ModelField id="category-model" label="Modelo decisional" value={shown.categoryModel} models={models} onChange={update('categoryModel')} />
+        <div className="field">
+          <label>Categorías</label>
+          <CategoryEditor categories={shown.categories} onChange={update('categories')} setStatus={setStatus} />
+          <p className="field-hint">Arrastra una categoría para moverla (antes, después o dentro de otra) · clic en el nombre para editarlo.</p>
+        </div>
       </section>
     </div>
   );

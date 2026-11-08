@@ -1,5 +1,5 @@
 import { ollama, KEEP_ALIVE } from '../shared/ollama';
-import { CATEGORIES, childrenOf, describe, isLeaf, pathId, type CategoryBranch } from '../shared/categories';
+import { isLeaf, pathId, type CategoryTree } from '../shared/categories';
 
 // Límites de Tev1 / `/v1/systemone`.
 export const MAX_OPTIONS = 24; // opciones por pregunta `choice` (admite 26, pero está entrenado con 2–24)
@@ -20,7 +20,8 @@ export interface CategoryResult {
 interface ChoiceQuestion {
   type: 'choice';
   instructions: string;
-  criteria: Record<string, string>;
+  /** Opción → descripción; `null` deja que el nombre de la opción se describa a sí mismo. */
+  criteria: Record<string, string | null>;
 }
 
 interface PendingQuestion {
@@ -52,20 +53,19 @@ function chunk<T>(items: T[], size: number): T[][] {
  * a estar en ese nodo. Si un nodo supera MAX_OPTIONS, sus hijos se reparten en bloques con una opción
  * extra "ninguna", y luego se renormalizan juntos (ver `conditionalProbabilities`).
  */
-function buildQuestions(node: CategoryBranch = CATEGORIES, path: string[] = [], questions: PendingQuestion[] = []): PendingQuestion[] {
-  const children = childrenOf(node);
+function buildQuestions(children: CategoryTree, path: string[] = [], questions: PendingQuestion[] = []): PendingQuestion[] {
   if (children.length > 1) {
     const split = children.length > MAX_OPTIONS;
     const instructions = path.length
       ? `Suponiendo que la incidencia descrita en este resumen de una llamada de soporte pertenece a "${path.join(' › ')}", ¿qué subcategoría la describe mejor?`
       : '¿A qué área pertenece la incidencia descrita en este resumen de una llamada de soporte?';
     for (const part of split ? chunk(children, MAX_OPTIONS - 1) : [children]) {
-      const criteria = Object.fromEntries(part.map(([key, child]) => [key, describe(child)]));
+      const criteria: Record<string, string | null> = Object.fromEntries(part.map((child) => [child.name, child.description || null]));
       if (split) criteria[NONE] = NONE_DESCRIPTION;
       questions.push({ name: `q${questions.length}`, nodeId: pathId(path), body: { type: 'choice', instructions, criteria } });
     }
   }
-  for (const [key, child] of children) if (!isLeaf(child)) buildQuestions(child, [...path, key], questions);
+  for (const child of children) if (!isLeaf(child)) buildQuestions(child.children, [...path, child.name], questions);
   return questions;
 }
 
@@ -131,9 +131,10 @@ function conditionalProbabilities(questions: PendingQuestion[], answers: Record<
 export async function categorize(
   model: string,
   summary: string,
+  categories: CategoryTree,
   onProgress: (done: number, total: number) => void = () => {}
 ): Promise<CategoryResult> {
-  const questions = buildQuestions();
+  const questions = buildQuestions(categories);
   const batches = batchQuestions(questions, byteLength({ model, state: summary, keep_alive: KEEP_ALIVE, questions: {} }));
   let done = 0;
   onProgress(done, batches.length);
@@ -148,20 +149,19 @@ export async function categorize(
 
   const scores: Record<string, number> = {};
   let best: { path?: string[]; score: number } = { score: -1 };
-  (function walk(node: CategoryBranch, path: string[], joint: number) {
-    const children = childrenOf(node);
-    for (const [key, child] of children) {
-      const childPath = [...path, key];
+  (function walk(children: CategoryTree, path: string[], joint: number) {
+    for (const child of children) {
+      const childPath = [...path, child.name];
       const id = pathId(childPath);
       const score = children.length > 1 ? joint * (conditional[id] ?? 0) : joint;
       if (children.length > 1) scores[id] = score;
       if (isLeaf(child)) {
         if (score > best.score) best = { path: childPath, score };
       } else {
-        walk(child, childPath, score);
+        walk(child.children, childPath, score);
       }
     }
-  })(CATEGORIES, [], 1);
+  })(categories, [], 1);
 
   if (!best.path || best.score <= 0) throw new Error('El modelo decisional no devolvió ninguna categoría válida.');
   return { path: best.path, score: best.score, scores };
