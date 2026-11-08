@@ -2,17 +2,26 @@ import { ollama, DEFAULT_ASR_MODEL } from './ollama.js';
 
 export const SPEAKERS = { agent: 'AGENTE', user: 'USUARIO' };
 
-export const DEFAULT_ASR_PROMPT = 'language Spanish<asr_text>';
+/** Idiomas de transcripción: valor que entiende Qwen3-ASR → etiqueta visible. */
+export const LANGUAGES = { Spanish: 'Español', English: 'Inglés' };
+export const DEFAULT_LANGUAGE = 'Spanish';
+export const buildAsrPrompt = (language) => `language ${language}<asr_text>`;
+export const DEFAULT_ASR_PROMPT = buildAsrPrompt(DEFAULT_LANGUAGE);
 
 export const DEFAULT_SUMMARY_PROMPT = 'Eres asistente de un servicio técnico de call center. Recibirás la transcripción automática de una llamada en la que cada intervención va etiquetada: [AGENTE] es el técnico que atiende y [USUARIO] es el cliente que reporta la incidencia. La transcripción puede contener errores, cortes o frases incompletas. Reconstruye la conversación y redacta en español un resumen breve, claro y útil para abrir o documentar la incidencia. Incluye, cuando aparezcan: motivo de contacto, producto o servicio afectado, problema y síntomas descritos por el usuario, cuándo ocurre, mensajes de error, pasos que el usuario ya había probado, comprobaciones o pasos indicados por el agente y la respuesta o resultado del usuario en cada uno, solución aplicada o próximos pasos, impacto o urgencia y estado final de la llamada. Atribuye la información a quien la dice cuando sea relevante. No inventes datos ni presentes suposiciones como hechos. Si falta un dato importante, indícalo como pendiente de confirmar. Omite saludos, repeticiones y conversación irrelevante. Devuelve solo el resumen en viñetas, sin introducción.';
 
+const RESTRICTED_URL = /^(chrome|edge|about|chrome-extension):/i;
+export const isCapturableUrl = (url) => Boolean(url) && !RESTRICTED_URL.test(url);
+
 /** Configuración efectiva: lo guardado por el usuario o, si está vacío, el valor por defecto. */
 export async function getSettings() {
-  const saved = await chrome.storage.local.get(['model', 'summaryModel', 'asrPrompt', 'summaryPrompt']);
+  const saved = await chrome.storage.local.get(['model', 'summaryModel', 'language', 'summaryPrompt']);
+  const language = LANGUAGES[saved.language] ? saved.language : DEFAULT_LANGUAGE;
   return {
     model: saved.model || DEFAULT_ASR_MODEL,
     summaryModel: saved.summaryModel || '',
-    asrPrompt: saved.asrPrompt?.trim() || DEFAULT_ASR_PROMPT,
+    language,
+    asrPrompt: buildAsrPrompt(language),
     summaryPrompt: saved.summaryPrompt?.trim() || DEFAULT_SUMMARY_PROMPT
   };
 }

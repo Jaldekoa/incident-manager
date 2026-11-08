@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VoiceOps · Micrófono</title>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="dashboard.css">
+  <style>
+    html, body { width: auto; max-width: none; }
+    body { max-height: none; padding: 40px 16px; }
+    main { max-width: 480px; margin: 0 auto; }
+    #message { margin: 0 0 10px; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="panel">
+      <div class="section-heading">
+        <h2><span class="material-symbols-outlined">mic</span> Permiso de micrófono</h2>
+      </div>
+      <p id="message">Acepta la petición del navegador para que la extensión pueda transcribir al agente.</p>
+      <button id="open-site-settings" class="outline-button" type="button" hidden>Abrir permisos de la extensión</button>
+    </section>
+  </main>
+  <script type="module" src="permission.js"></script>
+</body>
+</html>

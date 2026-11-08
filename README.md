@@ -21,7 +21,7 @@ El panel consulta Ollama y muestra los modelos que ya tienes instalados. Elige `
 ## Uso
 
 1. Abre la llamada o el vídeo en una pestaña web normal y pulsa el icono de la extensión. El icono solo abre el popup; **no inicia la captura**.
-2. Desde el popup, elige el modelo de voz y pulsa **Cargar modelo** si quieres precalentarlo. Luego pulsa **Comenzar captura** para transcribir el audio de la pestaña activa.
+2. Elige los modelos en la configuración (engranaje) y pulsa **Cargar modelo** si quieres precalentarlo. Luego pulsa **Comenzar captura** para transcribir el audio de la pestaña activa.
 3. Puedes cambiar a otra pestaña o ventana: la captura continúa en segundo plano. Vuelve al popup y pulsa **Detener captura** cuando termine la llamada. El distintivo **REC** indica que sigue activa; también se puede detener desde el menú contextual del icono.
 4. Pulsa **Generar resumen** para resumir la conversación con el modelo de texto seleccionado. Los botones **Copiar** copian la transcripción o el resumen.
 
@@ -31,14 +31,22 @@ La captura usa ventanas continuas de cuatro segundos con un segundo de solape pa
 
 ## Configuración
 
-El botón del engranaje (arriba a la derecha) abre la página de configuración, donde puedes:
+El botón del engranaje (arriba a la derecha) muestra la configuración dentro del propio popup; la flecha vuelve a la vista principal. Allí puedes:
 
 - Elegir el modelo STT y el modelo LLM del resumen.
-- Editar el prompt de cada sección (o restaurar los valores por defecto).
-- Conceder el permiso de micrófono a la extensión. **Es necesario hacerlo una vez** para que se transcriba al agente; sin él solo se transcribe al usuario.
+- Elegir el idioma de la transcripción (Español o Inglés).
+- Editar el prompt del resumen (o restaurar el valor por defecto).
+
+Pulsa **Guardar** para aplicar los cambios.
+
+## Fuentes de audio
+
+A la izquierda del header, dos indicadores muestran qué se puede capturar: un punto verde o rojo junto al icono de **pantalla** (audio de la pestaña activa, `[USUARIO]`) y junto al icono de **micrófono** (`[AGENTE]`). Pasa el ratón por encima para ver el motivo.
+
+Si el micrófono está en rojo, púlsalo: se abre una pestaña para conceder el permiso (Chrome no permite pedirlo desde el popup). **Basta con hacerlo una vez**; sin él solo se transcribe al usuario.
 
 ## Resumen de la llamada
 
-Debajo de la transcripción, elige un modelo de texto instalado en Ollama y pulsa **Generar resumen** cuando quieras resumir la conversación. Gracias a las etiquetas, el resumen reconstruye quién dice qué: motivo de contacto, producto o servicio afectado, síntomas, errores, pasos indicados por el agente y respuestas del usuario, solución o próximos pasos e impacto/urgencia; señala los datos importantes que falten y no debe inventar información. Puedes editar o copiar el resultado desde el cuadro de resumen. El botón **Limpiar sesión** (papelera, arriba) limpia tanto la transcripción como el resumen.
+Pulsa **Generar resumen** cuando quieras resumir la conversación. Gracias a las etiquetas, el resumen reconstruye quién dice qué: motivo de contacto, producto o servicio afectado, síntomas, errores, pasos indicados por el agente y respuestas del usuario, solución o próximos pasos e impacto/urgencia; señala los datos importantes que falten y no debe inventar información. Puedes editar o copiar el resultado desde el cuadro de resumen. El botón **Limpiar sesión** (papelera, arriba) limpia tanto la transcripción como el resumen.
 
 Tanto la transcripción como el resumen se procesan en `http://127.0.0.1:11434`; no se envían a servicios externos.

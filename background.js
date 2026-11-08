@@ -1,6 +1,5 @@
-import { getSettings, SPEAKERS } from './settings.js';
+import { getSettings, isCapturableUrl, SPEAKERS } from './settings.js';
 
-const RESTRICTED_URL = /^(chrome|edge|about|chrome-extension):/i;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function hasOffscreen() {
@@ -65,7 +64,7 @@ function appendSegment({ transcript = '', lastSegments = {}, lastSpeaker = '' },
 }
 
 async function startCaptureForTab(tab) {
-  if (!tab?.id || !tab.url || RESTRICTED_URL.test(tab.url)) {
+  if (!tab?.id || !isCapturableUrl(tab.url)) {
     throw new Error('Abre la llamada en una pestaña web normal y pulsa allí el icono de la extensión.');
   }
   await ensureOffscreen();

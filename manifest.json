@@ -7,6 +7,5 @@
   "permissions": ["tabCapture", "activeTab", "storage", "offscreen", "contextMenus", "clipboardWrite"],
   "host_permissions": ["http://127.0.0.1:11434/*"],
   "action": { "default_title": "Abrir controles de transcripción", "default_popup": "dashboard.html" },
-  "options_page": "options.html",
   "background": { "service_worker": "background.js", "type": "module" }
 }
