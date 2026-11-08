@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  DEFAULT_LANGUAGE, DEFAULT_SUMMARY_PROMPT, LANGUAGES, getSettings, isLanguage, pickModels,
-  type Language, type ModelChoice
-} from '../../shared/settings';
+import { DEFAULT_LANGUAGE, DEFAULT_SUMMARY_PROMPT, LANGUAGES } from '../../config';
+import { getSettings, isLanguage, pickModels, type Language, type ModelChoice } from '../../shared/settings';
 import { getLocal, setLocal } from '../../shared/storage';
 import { errorMessage } from '../../shared/errors';
 import { normalizeCategories, resolveCategories, validateCategories, type CategoryTree } from '../../shared/categories';

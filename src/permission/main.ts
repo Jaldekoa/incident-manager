@@ -1,7 +1,11 @@
 import 'material-symbols/outlined.css';
 import '../popup/dashboard.css';
 import './permission.css';
+import { APP_ICON, APP_NAME } from '../config';
 import { errorMessage } from '../shared/errors';
+
+document.querySelector('#brand-icon')!.textContent = APP_ICON;
+document.querySelector('#brand-name')!.textContent = APP_NAME;
 
 // Página auxiliar: el popup no puede mostrar la petición de permiso de micrófono, una pestaña sí.
 const message = document.querySelector<HTMLParagraphElement>('#message')!;

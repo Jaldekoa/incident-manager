@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { buildAsrPrompt, DEFAULT_SUMMARY_PROMPT, getSettings, isCapturableUrl, pickModels } from '../src/shared/settings';
-import { DEFAULT_ASR_MODEL } from '../src/shared/ollama';
+import { asrPrompt, DEFAULT_ASR_MODEL, DEFAULT_SUMMARY_PROMPT } from '../src/config';
+import { getSettings, isCapturableUrl, pickModels } from '../src/shared/settings';
 
 const mockStorage = (saved: Record<string, unknown>) =>
   vi.stubGlobal('chrome', { storage: { local: { get: async () => saved } } });
@@ -46,7 +46,7 @@ describe('getSettings', () => {
 
   it('genera el prompt STT a partir del idioma e ignora idiomas desconocidos o prompts vacíos', async () => {
     mockStorage({ language: 'English', summaryPrompt: '   ' });
-    expect(await getSettings()).toMatchObject({ asrPrompt: buildAsrPrompt('English'), summaryPrompt: DEFAULT_SUMMARY_PROMPT });
+    expect(await getSettings()).toMatchObject({ asrPrompt: asrPrompt('English'), summaryPrompt: DEFAULT_SUMMARY_PROMPT });
     mockStorage({ language: 'Klingon' });
     expect((await getSettings()).language).toBe('Spanish');
   });

@@ -1,9 +1,6 @@
-export const TARGET_RATE = 16000;
-export const WINDOW_SECONDS = 4;
-export const STRIDE_SECONDS = 3; // 1 s de solape entre ventanas
-export const SILENCE_RMS = 0.005; // por debajo, la ventana se considera silencio y no se envía al ASR
+import { ASR_SAMPLE_RATE as TARGET_RATE, STRIDE_SECONDS, WINDOW_SECONDS } from '../config';
 
-/** Remuestrea a 16 kHz mono y devuelve los bytes de un WAV PCM16. */
+/** Remuestrea a ASR_SAMPLE_RATE mono y devuelve los bytes de un WAV PCM16. */
 export function wavFromPcm(input: Float32Array, sourceRate: number): Uint8Array {
   const length = Math.floor(input.length * TARGET_RATE / sourceRate);
   const buffer = new ArrayBuffer(44 + length * 2);
@@ -34,13 +31,13 @@ export function rms(samples: Float32Array): number {
   return Math.sqrt(sum / samples.length);
 }
 
-/** Acumula audio en un buffer circular y llama a `onWindow` con una ventana de 4 s cada 3 s. */
+/** Acumula audio en un buffer circular y llama a `onWindow` con una ventana de WINDOW_SECONDS cada STRIDE_SECONDS. */
 export function createWindower(sampleRate: number, onWindow: (samples: Float32Array) => void): (input: Float32Array) => void {
   const windowSamples = Math.ceil(sampleRate * WINDOW_SECONDS);
   const strideSamples = Math.ceil(sampleRate * STRIDE_SECONDS);
   const ring = new Float32Array(windowSamples);
   let writeIndex = 0;
-  // Empieza en negativo para que la primera ventana salga justo al llenarse (4 s) y las siguientes cada 3 s.
+  // Empieza en negativo para que la primera ventana salga justo al llenarse y las siguientes cada STRIDE_SECONDS.
   let sinceWindow = strideSamples - windowSamples;
   return (input) => {
     for (let i = 0; i < input.length; i++) {

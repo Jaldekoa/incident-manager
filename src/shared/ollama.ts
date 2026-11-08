@@ -1,6 +1,4 @@
-export const OLLAMA_URL = 'http://127.0.0.1:11434';
-export const DEFAULT_ASR_MODEL = 'frozenlab/qwen3-asr:0.6b';
-export const KEEP_ALIVE = '30m';
+import { OLLAMA_URL } from '../config';
 
 export interface ChatResponse {
   message?: { content?: string };

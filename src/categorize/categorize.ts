@@ -1,12 +1,12 @@
-import { ollama, KEEP_ALIVE } from '../shared/ollama';
+import { CATEGORY_NONE_OPTION, CATEGORY_ROOT_QUESTION, KEEP_ALIVE, categorySubQuestion } from '../config';
+import { ollama } from '../shared/ollama';
 import { isLeaf, pathId, type CategoryTree } from '../shared/categories';
 
-// Límites de Tev1 / `/v1/systemone`.
+// Límites de la API de Tev1 (`/v1/systemone`); no son opciones de la extensión.
 export const MAX_OPTIONS = 24; // opciones por pregunta `choice` (admite 26, pero está entrenado con 2–24)
 export const MAX_QUESTIONS = 64; // preguntas por petición
 export const MAX_BODY_BYTES = 60 * 1024; // el cuerpo admite 64 KiB; se deja margen
-const NONE = 'ninguna_de_las_anteriores';
-const NONE_DESCRIPTION = 'Ninguna de las demás opciones describe la incidencia.';
+const NONE = CATEGORY_NONE_OPTION.name;
 
 export interface CategoryResult {
   /** Ruta de la categoría elegida, p. ej. `['informatica', 'hardware', 'impresoras']`. */
@@ -56,12 +56,10 @@ function chunk<T>(items: T[], size: number): T[][] {
 function buildQuestions(children: CategoryTree, path: string[] = [], questions: PendingQuestion[] = []): PendingQuestion[] {
   if (children.length > 1) {
     const split = children.length > MAX_OPTIONS;
-    const instructions = path.length
-      ? `Suponiendo que la incidencia descrita en este resumen de una llamada de soporte pertenece a "${path.join(' › ')}", ¿qué subcategoría la describe mejor?`
-      : '¿A qué área pertenece la incidencia descrita en este resumen de una llamada de soporte?';
+    const instructions = path.length ? categorySubQuestion(path) : CATEGORY_ROOT_QUESTION;
     for (const part of split ? chunk(children, MAX_OPTIONS - 1) : [children]) {
       const criteria: Record<string, string | null> = Object.fromEntries(part.map((child) => [child.name, child.description || null]));
-      if (split) criteria[NONE] = NONE_DESCRIPTION;
+      if (split) criteria[NONE] = CATEGORY_NONE_OPTION.description;
       questions.push({ name: `q${questions.length}`, nodeId: pathId(path), body: { type: 'choice', instructions, criteria } });
     }
   }

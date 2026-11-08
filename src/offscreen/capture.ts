@@ -1,11 +1,11 @@
-import { ollama, DEFAULT_ASR_MODEL, KEEP_ALIVE, type ChatResponse } from '../shared/ollama';
-import { DEFAULT_ASR_PROMPT, SPEAKERS, type Speaker } from '../shared/settings';
+import {
+  ASR_TEXT_TAG, DEFAULT_ASR_MODEL, DEFAULT_LANGUAGE, KEEP_ALIVE, MIC_CONSTRAINTS, SILENCE_RMS, SPEAKERS, asrPrompt
+} from '../config';
+import { ollama, type ChatResponse } from '../shared/ollama';
+import type { Speaker } from '../shared/settings';
 import { sendToBackground, type AsrSettings } from '../shared/messages';
 import { errorMessage } from '../shared/errors';
-import { createWindower, rms, SILENCE_RMS, toBase64, wavFromPcm } from './audio';
-
-const ASR_TAG = '<asr_text>';
-const MIC_CONSTRAINTS: MediaTrackConstraints = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+import { createWindower, rms, toBase64, wavFromPcm } from './audio';
 
 interface CaptureSession {
   context: AudioContext;
@@ -32,7 +32,7 @@ export function enqueueCaptureOperation<T>(operation: () => Promise<T>): Promise
 async function getAsrSettings(): Promise<AsrSettings> {
   const response = await sendToBackground({ type: 'GET_SETTINGS' });
   const settings = response && 'model' in response ? response : undefined;
-  return { model: settings?.model || DEFAULT_ASR_MODEL, asrPrompt: settings?.asrPrompt || DEFAULT_ASR_PROMPT };
+  return { model: settings?.model || DEFAULT_ASR_MODEL, asrPrompt: settings?.asrPrompt || asrPrompt(DEFAULT_LANGUAGE) };
 }
 
 export const preloadModel = (model: string) =>
@@ -55,8 +55,8 @@ async function transcribe(wav: Uint8Array, speaker: Speaker, generation: number)
   } finally {
     if (activeRequest === controller) activeRequest = undefined;
   }
-  const tagIndex = raw.indexOf(ASR_TAG);
-  const text = (tagIndex >= 0 ? raw.slice(tagIndex + ASR_TAG.length) : raw).replace(/<\|[^|]+\|>/g, '').trim();
+  const tagIndex = raw.indexOf(ASR_TEXT_TAG);
+  const text = (tagIndex >= 0 ? raw.slice(tagIndex + ASR_TEXT_TAG.length) : raw).replace(/<\|[^|]+\|>/g, '').trim();
   if (text && isCurrent(generation)) await sendToBackground({ type: 'APPEND_TRANSCRIPT', speaker, text });
 }
 

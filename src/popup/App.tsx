@@ -3,6 +3,7 @@ import { getSession } from '../shared/storage';
 import { useStatus } from './hooks/useStatus';
 import { useInstalledModels } from './hooks/useInstalledModels';
 import { StatusBar } from './components/StatusBar';
+import { BrandBar } from './components/BrandBar';
 import { MainView } from './views/MainView';
 import { SettingsView } from './views/SettingsView';
 
@@ -33,6 +34,7 @@ export function App() {
   // Ambas vistas siguen montadas (solo se ocultan) para no perder textos editados ni acciones en curso.
   return (
     <main>
+      <BrandBar />
       <MainView hidden={view !== 'main'} setStatus={setStatus} onOpenSettings={() => show('settings')} />
       <SettingsView visible={view === 'settings'} models={models} setStatus={setStatus} onClose={() => show('main')} />
       <StatusBar status={status} />

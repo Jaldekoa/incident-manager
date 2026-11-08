@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createWindower, rms, SILENCE_RMS, TARGET_RATE, toBase64, wavFromPcm } from '../src/offscreen/audio';
+import { createWindower, rms, toBase64, wavFromPcm } from '../src/offscreen/audio';
+import { ASR_SAMPLE_RATE as TARGET_RATE, SILENCE_RMS } from '../src/config';
 
 const ascii = (bytes: Uint8Array, start: number, length: number) => String.fromCharCode(...bytes.subarray(start, start + length));
 

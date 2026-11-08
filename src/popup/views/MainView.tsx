@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ollama, KEEP_ALIVE, type ChatResponse } from '../../shared/ollama';
+import { KEEP_ALIVE, summaryUserPrompt } from '../../config';
+import { ollama, type ChatResponse } from '../../shared/ollama';
 import { getSettings } from '../../shared/settings';
 import { getSession, setLocal } from '../../shared/storage';
 import { sendToBackground, type Broadcast } from '../../shared/messages';
@@ -115,7 +116,7 @@ export function MainView({ hidden, setStatus, onOpenSettings }: Props) {
             keep_alive: KEEP_ALIVE,
             messages: [
               { role: 'system', content: summaryPrompt },
-              { role: 'user', content: `Resume esta transcripción de una llamada de soporte técnico:\n\n${text}` }
+              { role: 'user', content: summaryUserPrompt(text) }
             ]
           }
         });

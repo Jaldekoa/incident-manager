@@ -1,6 +1,6 @@
-# Transcripción local de llamadas
+# Incident Manager
 
-Extensión de Chrome para transcribir en español el audio de una pestaña web con Ollama local. Captura dos fuentes: el audio de la pestaña de la llamada (el **usuario**) y el micrófono del **agente**; el audio de la pestaña sigue sonando mientras se captura. No escribe grabaciones en disco.
+Extensión de Chrome para gestionar incidencias reportadas en llamadas de soporte: transcribe, resume y categoriza en local con Ollama. Captura dos fuentes: el audio de la pestaña de la llamada (el **usuario**) y el micrófono del **agente**; el audio de la pestaña sigue sonando mientras se captura. No escribe grabaciones en disco.
 
 ## Modelo
 
@@ -41,17 +41,35 @@ Tras cambiar el código, vuelve a ejecutar `npm run build` y pulsa **Recargar** 
 | `npm run dev` | Servidor de desarrollo con recarga del popup (carga `dist/` una vez) |
 | `npm test` | Tests unitarios (Vitest) |
 | `npm run typecheck` | Solo comprobación de tipos |
+| `npm run icons` | Regenera los iconos de la extensión (`public/icons/`) a partir de `APP_ICON` |
 
 Estructura:
 
+- `src/config/`: **valores por defecto y constantes editables** (ver abajo).
 - `src/background/`: service worker (control de la captura, transcripción etiquetada).
 - `src/offscreen/`: documento oculto que captura pestaña y micrófono y llama al modelo STT.
 - `src/popup/`: interfaz en React (vista principal y configuración).
 - `src/permission/`: página para conceder el permiso de micrófono.
 - `src/categorize/`: categorización con Tev1 por probabilidad conjunta.
-- `src/shared/`: Ollama, configuración, categorías, `chrome.storage` y mensajes tipados entre contextos.
+- `src/shared/`: cliente de Ollama, ajustes guardados, árbol de categorías, `chrome.storage` y mensajes tipados entre contextos.
 - `public/capture-worklet.js`: AudioWorklet que recoge las muestras de audio.
 - `tests/`: tests de la lógica sin interfaz.
+- `scripts/generate-icons.mjs`: genera los PNG del icono.
+
+### Configuración por defecto (`src/config/`)
+
+Todo lo que un desarrollador puede querer cambiar está aquí; el resto del código lo importa desde `src/config`:
+
+| Archivo | Contenido |
+| --- | --- |
+| `app.ts` | Nombre (`APP_NAME`), descripción e icono (`APP_ICON`, un nombre de Material Symbols) |
+| `models.ts` | URL de Ollama, `keep_alive`, modelo STT por defecto y patrones para elegir modelos STT y decisional |
+| `languages.ts` | Idiomas disponibles e idioma por defecto |
+| `prompts.ts` | Prompt del STT, prompt de resumen por defecto, mensaje de usuario del resumen y preguntas de categorización |
+| `categories.ts` | Árbol de categorías por defecto (con sus descripciones) |
+| `capture.ts` | Etiquetas de hablante, ventana/solape del audio, umbral de silencio y opciones del micrófono |
+
+Los valores de `models.ts`, `languages.ts`, `prompts.ts` y `categories.ts` son solo los iniciales: lo que el usuario guarda en Configuración tiene prioridad. Si cambias `APP_ICON`, ejecuta `npm run icons`. Si cambias la URL de Ollama, el permiso del manifest se actualiza solo.
 
 ## Uso
 
@@ -102,6 +120,6 @@ En **Configuración › Categoría** está el editor del árbol:
 - **Clic en el nombre** abre su nombre y su descripción para editarlos. La descripción es lo que usa el modelo decisional para elegir, así que conviene que sea clara.
 - **Añadir área** crea una categoría de primer nivel y **Restaurar por defecto** recupera el árbol original.
 
-Una categoría sin subcategorías es una categoría final. Los cambios se aplican al pulsar **Guardar**, que comprueba que no haya nombres vacíos ni repetidos entre hermanas; si vuelves atrás sin guardar, se descartan. El árbol por defecto está definido en `src/shared/categories.ts`.
+Una categoría sin subcategorías es una categoría final. Los cambios se aplican al pulsar **Guardar**, que comprueba que no haya nombres vacíos ni repetidos entre hermanas; si vuelves atrás sin guardar, se descartan. El árbol por defecto está definido en `src/config/categories.ts`.
 
 La transcripción, el resumen y la categorización se procesan en `http://127.0.0.1:11434`; no se envían a servicios externos.
