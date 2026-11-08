@@ -3,7 +3,7 @@ import { isLeaf, pathId, type CategoryTree as Categories } from '../../shared/ca
 import type { CategoryResult } from '../../categorize/categorize';
 import { Icon } from './Icon';
 
-const PLACEHOLDER = 'Categoriza el resumen para asignar una categoría…';
+const PLACEHOLDER = 'Categorización del resumen…';
 
 const formatScore = (score: number | undefined) => (score !== undefined && Number.isFinite(score) ? `${Math.round(score * 100)} %` : '');
 
