@@ -1,0 +1,13 @@
+import { defineManifest } from '@crxjs/vite-plugin';
+
+export default defineManifest({
+  manifest_version: 3,
+  minimum_chrome_version: '116',
+  name: 'Transcripción local de llamadas',
+  version: '0.1.0',
+  description: 'Transcribe en español el audio de una pestaña con Ollama local.',
+  permissions: ['tabCapture', 'activeTab', 'storage', 'offscreen', 'contextMenus', 'clipboardWrite'],
+  host_permissions: ['http://127.0.0.1:11434/*'],
+  action: { default_title: 'Abrir controles de transcripción', default_popup: 'src/popup/index.html' },
+  background: { service_worker: 'src/background/index.ts', type: 'module' }
+});

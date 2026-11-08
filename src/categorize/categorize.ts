@@ -1,17 +1,48 @@
-import { ollama, KEEP_ALIVE } from './ollama.js';
-import { CATEGORIES, childrenOf, describe, isLeaf, pathId } from './categories.js';
+import { ollama, KEEP_ALIVE } from '../shared/ollama';
+import { CATEGORIES, childrenOf, describe, isLeaf, pathId, type CategoryBranch } from '../shared/categories';
 
 // Límites de Tev1 / `/v1/systemone`.
-const MAX_OPTIONS = 24; // opciones por pregunta `choice` (admite 26, pero está entrenado con 2–24)
-const MAX_QUESTIONS = 64; // preguntas por petición
-const MAX_BODY_BYTES = 60 * 1024; // el cuerpo admite 64 KiB; se deja margen
+export const MAX_OPTIONS = 24; // opciones por pregunta `choice` (admite 26, pero está entrenado con 2–24)
+export const MAX_QUESTIONS = 64; // preguntas por petición
+export const MAX_BODY_BYTES = 60 * 1024; // el cuerpo admite 64 KiB; se deja margen
 const NONE = 'ninguna_de_las_anteriores';
 const NONE_DESCRIPTION = 'Ninguna de las demás opciones describe la incidencia.';
 
-const byteLength = (value) => new TextEncoder().encode(JSON.stringify(value)).length;
+export interface CategoryResult {
+  /** Ruta de la categoría elegida, p. ej. `['informatica', 'hardware', 'impresoras']`. */
+  path: string[];
+  /** Probabilidad conjunta de la categoría elegida. */
+  score?: number;
+  /** Probabilidad conjunta de cada nodo evaluado por el modelo, indexada por `pathId`. */
+  scores: Record<string, number>;
+}
 
-function chunk(items, size) {
-  const chunks = [];
+interface ChoiceQuestion {
+  type: 'choice';
+  instructions: string;
+  criteria: Record<string, string>;
+}
+
+interface PendingQuestion {
+  name: string;
+  nodeId: string;
+  body: ChoiceQuestion;
+}
+
+interface ChoiceAnswer {
+  choice?: string;
+  confidence?: number;
+  probabilities?: Record<string, number> | Array<{ option?: string; choice?: string; label?: string; name?: string; probability?: number; p?: number }>;
+}
+
+interface SystemOneResponse {
+  answers?: Record<string, ChoiceAnswer>;
+}
+
+const byteLength = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
   return chunks;
 }
@@ -21,7 +52,7 @@ function chunk(items, size) {
  * a estar en ese nodo. Si un nodo supera MAX_OPTIONS, sus hijos se reparten en bloques con una opción
  * extra "ninguna", y luego se renormalizan juntos (ver `conditionalProbabilities`).
  */
-function buildQuestions(node = CATEGORIES, path = [], questions = []) {
+function buildQuestions(node: CategoryBranch = CATEGORIES, path: string[] = [], questions: PendingQuestion[] = []): PendingQuestion[] {
   const children = childrenOf(node);
   if (children.length > 1) {
     const split = children.length > MAX_OPTIONS;
@@ -39,9 +70,9 @@ function buildQuestions(node = CATEGORIES, path = [], questions = []) {
 }
 
 /** Agrupa las preguntas en peticiones que respeten el máximo de preguntas y de tamaño del cuerpo. */
-function batchQuestions(questions, baseBytes) {
-  const batches = [];
-  let current = [];
+function batchQuestions(questions: PendingQuestion[], baseBytes: number): PendingQuestion[][] {
+  const batches: PendingQuestion[][] = [];
+  let current: PendingQuestion[] = [];
   let bytes = baseBytes;
   for (const question of questions) {
     const size = byteLength({ [question.name]: question.body });
@@ -57,10 +88,11 @@ function batchQuestions(questions, baseBytes) {
 }
 
 /** Probabilidades de una respuesta `choice` como `{ opción: p }`; si no vienen, usa la opción elegida. */
-function probabilitiesOf(answer) {
-  const { probabilities, choice, confidence } = answer || {};
+function probabilitiesOf(answer: ChoiceAnswer | undefined): Record<string, number> {
+  const { probabilities, choice, confidence } = answer ?? {};
   if (Array.isArray(probabilities)) {
-    return Object.fromEntries(probabilities.map((item) => [item.option ?? item.choice ?? item.label ?? item.name, item.probability ?? item.p]));
+    return Object.fromEntries(probabilities.map((item) =>
+      [item.option ?? item.choice ?? item.label ?? item.name ?? '', item.probability ?? item.p ?? NaN]));
   }
   if (probabilities && typeof probabilities === 'object') return probabilities;
   return choice ? { [choice]: confidence ?? 1 } : {};
@@ -70,8 +102,8 @@ function probabilitiesOf(answer) {
  * P(hijo | nodo) para cada hijo, indexada por `pathId` del hijo. Une los bloques de un mismo nodo
  * (descartando "ninguna") y normaliza para que los hijos de cada nodo sumen 1.
  */
-function conditionalProbabilities(questions, answers) {
-  const byNode = {};
+function conditionalProbabilities(questions: PendingQuestion[], answers: Record<string, ChoiceAnswer>): Record<string, number> {
+  const byNode: Record<string, Record<string, number>> = {};
   for (const { name, nodeId } of questions) {
     if (!answers[name]) throw new Error('Respuesta incompleta del modelo decisional.');
     for (const [key, value] of Object.entries(probabilitiesOf(answers[name]))) {
@@ -80,7 +112,7 @@ function conditionalProbabilities(questions, answers) {
       (byNode[nodeId] ??= {})[key] = probability;
     }
   }
-  const conditional = {};
+  const conditional: Record<string, number> = {};
   for (const [nodeId, children] of Object.entries(byNode)) {
     const total = Object.values(children).reduce((sum, p) => sum + p, 0);
     for (const [key, p] of Object.entries(children)) {
@@ -94,37 +126,43 @@ function conditionalProbabilities(questions, answers) {
  * Clasifica `summary` buscando la categoría final de mayor probabilidad conjunta:
  * P(área) × P(subgrupo | área) × … × P(categoría | padre). Todas las preguntas se resuelven de una vez
  * (repartidas en las peticiones necesarias) y luego se recorre el árbol completo.
- * Devuelve `{ path, score, scores }`; `scores` tiene la probabilidad conjunta de cada nodo evaluado por el
- * modelo (los nodos con un único hijo no se consultan y no aparecen).
+ * Los nodos con un único hijo no se consultan y no aparecen en `scores`.
  */
-export async function categorize(model, summary, onProgress = () => {}) {
+export async function categorize(
+  model: string,
+  summary: string,
+  onProgress: (done: number, total: number) => void = () => {}
+): Promise<CategoryResult> {
   const questions = buildQuestions();
   const batches = batchQuestions(questions, byteLength({ model, state: summary, keep_alive: KEEP_ALIVE, questions: {} }));
   let done = 0;
   onProgress(done, batches.length);
   const responses = await Promise.all(batches.map(async (batch) => {
-    const { answers } = await ollama('/v1/systemone', {
+    const { answers } = await ollama<SystemOneResponse>('/v1/systemone', {
       body: { model, state: summary, keep_alive: KEEP_ALIVE, questions: Object.fromEntries(batch.map(({ name, body }) => [name, body])) }
     });
     onProgress(++done, batches.length);
-    return answers || {};
+    return answers ?? {};
   }));
   const conditional = conditionalProbabilities(questions, Object.assign({}, ...responses));
 
-  const scores = {};
-  let best = { score: -1 };
-  (function walk(node, path, joint) {
+  const scores: Record<string, number> = {};
+  let best: { path?: string[]; score: number } = { score: -1 };
+  (function walk(node: CategoryBranch, path: string[], joint: number) {
     const children = childrenOf(node);
     for (const [key, child] of children) {
       const childPath = [...path, key];
       const id = pathId(childPath);
       const score = children.length > 1 ? joint * (conditional[id] ?? 0) : joint;
       if (children.length > 1) scores[id] = score;
-      if (isLeaf(child)) { if (score > best.score) best = { path: childPath, score }; }
-      else walk(child, childPath, score);
+      if (isLeaf(child)) {
+        if (score > best.score) best = { path: childPath, score };
+      } else {
+        walk(child, childPath, score);
+      }
     }
   })(CATEGORIES, [], 1);
 
   if (!best.path || best.score <= 0) throw new Error('El modelo decisional no devolvió ninguna categoría válida.');
-  return { ...best, scores };
+  return { path: best.path, score: best.score, scores };
 }

@@ -3,13 +3,19 @@
  * Cada nodo es un objeto con `descripcion_global` y sus hijos; un hijo de tipo texto es una categoría final
  * (el texto es su descripción).
  */
-const DESCRIPTION = 'descripcion_global';
-export const isLeaf = (node) => typeof node === 'string';
-export const describe = (node) => (isLeaf(node) ? node : node[DESCRIPTION]);
-export const childrenOf = (node) => Object.entries(node).filter(([key]) => key !== DESCRIPTION);
-export const pathId = (path) => path.join('/');
+export type CategoryNode = string | CategoryBranch;
+export interface CategoryBranch {
+  [key: string]: CategoryNode;
+}
 
-export const CATEGORIES = {
+const DESCRIPTION = 'descripcion_global';
+export const isLeaf = (node: CategoryNode): node is string => typeof node === 'string';
+export const describe = (node: CategoryNode): string => (isLeaf(node) ? node : String(node[DESCRIPTION] ?? ''));
+export const childrenOf = (node: CategoryBranch): Array<[string, CategoryNode]> =>
+  Object.entries(node).filter(([key]) => key !== DESCRIPTION);
+export const pathId = (path: readonly string[]): string => path.join('/');
+
+export const CATEGORIES: CategoryBranch = {
   mantenimiento: {
     descripcion_global: 'Incidencias relacionadas con la infraestructura física, mobiliario, seguridad de los recintos y limpieza.',
     instalaciones: {

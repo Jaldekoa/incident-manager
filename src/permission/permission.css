@@ -1,0 +1,8 @@
+/*
+ * Página completa: reutiliza dashboard.css y solo ajusta el ancho fijo del popup.
+ * Se usa la clase de <html> para ganar en especificidad, porque Vite puede enlazar este CSS antes que dashboard.css.
+ */
+html.permission-page, html.permission-page body { width: auto; max-width: none; }
+html.permission-page body { max-height: none; padding: 40px 16px; }
+html.permission-page main { max-width: 480px; margin: 0 auto; }
+html.permission-page #message { margin: 0 0 10px; }

@@ -20,9 +20,38 @@ El panel consulta Ollama y muestra los modelos que ya tienes instalados. Elige `
 
 ## Instalar
 
+Requiere Node.js 20 o posterior.
+
+```powershell
+npm install
+npm run build
+```
+
 1. Abre `chrome://extensions` y activa **Modo de desarrollador**.
-2. Pulsa **Cargar descomprimida** y selecciona esta carpeta.
+2. Pulsa **Cargar descomprimida** y selecciona la carpeta **`dist/`** que genera el build.
 3. Chrome 116 o posterior es necesario para mantener la captura en segundo plano.
+
+Tras cambiar el código, vuelve a ejecutar `npm run build` y pulsa **Recargar** en la tarjeta de la extensión.
+
+## Desarrollo
+
+| Comando | Qué hace |
+| --- | --- |
+| `npm run build` | Comprueba tipos y genera `dist/` |
+| `npm run dev` | Servidor de desarrollo con recarga del popup (carga `dist/` una vez) |
+| `npm test` | Tests unitarios (Vitest) |
+| `npm run typecheck` | Solo comprobación de tipos |
+
+Estructura:
+
+- `src/background/`: service worker (control de la captura, transcripción etiquetada).
+- `src/offscreen/`: documento oculto que captura pestaña y micrófono y llama al modelo STT.
+- `src/popup/`: interfaz en React (vista principal y configuración).
+- `src/permission/`: página para conceder el permiso de micrófono.
+- `src/categorize/`: categorización con Tev1 por probabilidad conjunta.
+- `src/shared/`: Ollama, configuración, categorías, `chrome.storage` y mensajes tipados entre contextos.
+- `public/capture-worklet.js`: AudioWorklet que recoge las muestras de audio.
+- `tests/`: tests de la lógica sin interfaz.
 
 ## Uso
 
@@ -57,12 +86,12 @@ Pulsa **Generar resumen** cuando quieras resumir la conversación. Gracias a las
 
 ## Categoría
 
-Con el resumen generado, pulsa **Categorizar** para clasificar la incidencia en el árbol de `categories.js`. Se usa el modelo decisional Tev1 a través del endpoint `/v1/systemone` de Ollama y se elige la categoría final con **mayor probabilidad conjunta**: P(área) × P(subgrupo | área) × … × P(categoría | padre). Para ello se hace una pregunta por cada nodo con varias opciones y se recorre el árbol completo, de modo que un área algo menos probable puede ganar si contiene una categoría claramente más probable. Los nodos con una sola opción no se consultan.
+Con el resumen generado, pulsa **Categorizar** para clasificar la incidencia en el árbol de `src/shared/categories.ts`. Se usa el modelo decisional Tev1 a través del endpoint `/v1/systemone` de Ollama y se elige la categoría final con **mayor probabilidad conjunta**: P(área) × P(subgrupo | área) × … × P(categoría | padre). Para ello se hace una pregunta por cada nodo con varias opciones y se recorre el árbol completo, de modo que un área algo menos probable puede ganar si contiene una categoría claramente más probable. Los nodos con una sola opción no se consultan.
 
 El algoritmo escala con el árbol: los nodos con más de 24 opciones se dividen en bloques (con una opción "ninguna de las anteriores") que luego se renormalizan juntos, y las preguntas se reparten en varias peticiones si superan los límites de la API (64 preguntas o 64 KiB por petición).
 
 El resultado aparece en un selector jerárquico, deshabilitado hasta la primera categorización. Al abrirlo se ve el árbol completo: las ramas se despliegan con ▶, la rama elegida aparece abierta y cada opción evaluada por el modelo muestra a la derecha su probabilidad conjunta (las que no pasan por el modelo, sin porcentaje). Puedes elegir otra categoría a mano, y el botón de copiar copia la ruta seleccionada. Al pasar el cursor sobre una categoría se muestra su descripción.
 
-Para cambiar las categorías, edita `categories.js`: cada nodo lleva una `descripcion_global` y el resto de sus claves son hijos; un hijo de tipo texto es una categoría final con su descripción. El árbol puede tener cualquier profundidad y cualquier número de opciones por nodo.
+Para cambiar las categorías, edita `src/shared/categories.ts` y vuelve a hacer el build: cada nodo lleva una `descripcion_global` y el resto de sus claves son hijos; un hijo de tipo texto es una categoría final con su descripción. El árbol puede tener cualquier profundidad y cualquier número de opciones por nodo.
 
 La transcripción, el resumen y la categorización se procesan en `http://127.0.0.1:11434`; no se envían a servicios externos.
