@@ -63,7 +63,7 @@ Todo lo que un desarrollador puede querer cambiar está aquí; el resto del cód
 | Archivo | Contenido |
 | --- | --- |
 | `app.ts` | Nombre (`APP_NAME`), descripción e icono (`APP_ICON`, un nombre de Material Symbols) |
-| `models.ts` | URL de Ollama, `keep_alive`, modelo STT por defecto y patrones para elegir modelos STT y decisional |
+| `models.ts` | URL de Ollama, `keep_alive`, modelos por defecto (STT, resumen y decisional) y patrones para elegir otro si no están instalados |
 | `languages.ts` | Idiomas disponibles e idioma por defecto |
 | `prompts.ts` | Prompt del STT, prompt de resumen por defecto, mensaje de usuario del resumen y preguntas de categorización |
 | `categories.ts` | Árbol de categorías por defecto (con sus descripciones) |

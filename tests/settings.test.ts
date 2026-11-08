@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { asrPrompt, DEFAULT_ASR_MODEL, DEFAULT_SUMMARY_PROMPT } from '../src/config';
+import {
+  asrPrompt, DEFAULT_ASR_MODEL, DEFAULT_CATEGORY_MODEL, DEFAULT_SUMMARY_MODEL, DEFAULT_SUMMARY_PROMPT
+} from '../src/config';
 import { getSettings, isCapturableUrl, pickModels } from '../src/shared/settings';
 
 const mockStorage = (saved: Record<string, unknown>) =>
@@ -10,7 +12,15 @@ afterEach(() => vi.unstubAllGlobals());
 describe('pickModels', () => {
   const installed = ['llama3.2:3b', 'frozenlab/qwen3-asr:0.6b', 'tev1:latest'];
 
-  it('elige por rol: ASR para STT, un LLM normal para resumen y tev1 para categoría', () => {
+  it('prefiere los modelos por defecto si están instalados (con o sin `:latest`)', () => {
+    expect(pickModels(['llama3.2:3b', DEFAULT_SUMMARY_MODEL, `${DEFAULT_CATEGORY_MODEL}:latest`, DEFAULT_ASR_MODEL], {})).toEqual({
+      model: DEFAULT_ASR_MODEL,
+      summaryModel: DEFAULT_SUMMARY_MODEL,
+      categoryModel: `${DEFAULT_CATEGORY_MODEL}:latest`
+    });
+  });
+
+  it('sin los modelos por defecto, elige por rol: ASR para STT, un LLM normal para resumen y tev1 para categoría', () => {
     expect(pickModels(installed, {})).toEqual({
       model: 'frozenlab/qwen3-asr:0.6b',
       summaryModel: 'llama3.2:3b',
@@ -36,8 +46,8 @@ describe('getSettings', () => {
     mockStorage({});
     expect(await getSettings()).toEqual({
       model: DEFAULT_ASR_MODEL,
-      summaryModel: '',
-      categoryModel: '',
+      summaryModel: DEFAULT_SUMMARY_MODEL,
+      categoryModel: DEFAULT_CATEGORY_MODEL,
       language: 'Spanish',
       asrPrompt: 'language Spanish<asr_text>',
       summaryPrompt: DEFAULT_SUMMARY_PROMPT
