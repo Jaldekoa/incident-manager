@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VoiceOps · Configuración</title>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <header class="topbar options-topbar">
+      <h1><span class="material-symbols-outlined">settings</span> Configuración</h1>
+      <div class="header-actions">
+        <button id="reset" class="outline-button header-button" type="button" title="Rellena los prompts con los valores por defecto">Restaurar prompts</button>
+        <button id="save" class="generate-button header-button" type="button"><span class="material-symbols-outlined">save</span> Guardar</button>
+      </div>
+    </header>
+
+    <section class="panel">
+      <div class="section-heading">
+        <h2><span class="material-symbols-outlined">record_voice_over</span> Transcripción</h2>
+      </div>
+      <div class="field">
+        <label for="model">Modelo STT</label>
+        <select id="model"><option value="">Cargando modelos…</option></select>
+      </div>
+      <div class="field">
+        <label for="asr-prompt">Prompt STT</label>
+        <textarea id="asr-prompt" class="prompt-short" spellcheck="false"></textarea>
+        <p class="hint">Instrucción enviada con cada fragmento de audio. Para Qwen3-ASR conserva el formato <code>language Spanish&lt;asr_text&gt;</code>.</p>
+      </div>
+      <div class="field">
+        <label>Micrófono del agente</label>
+        <div class="mic-row">
+          <span id="mic-state" class="hint">Comprobando permiso…</span>
+          <button id="mic-permission" class="outline-button" type="button" hidden>Permitir micrófono</button>
+        </div>
+        <p class="hint">El micrófono se transcribe como <code>[AGENTE]</code> y el audio de la pestaña como <code>[USUARIO]</code>. Usa auriculares para que el micrófono no recoja la voz del usuario.</p>
+      </div>
+    </section>
+
+    <section class="panel summary-panel">
+      <div class="section-heading">
+        <h2><span class="material-symbols-outlined">psychology</span> Resumen</h2>
+      </div>
+      <div class="field">
+        <label for="summary-model">Modelo LLM</label>
+        <select id="summary-model"><option value="">Cargando modelos…</option></select>
+      </div>
+      <div class="field">
+        <label for="summary-prompt">Prompt de resumen (system)</label>
+        <textarea id="summary-prompt" class="prompt-long" spellcheck="false"></textarea>
+        <p class="hint">Se envía como instrucción de sistema junto con la transcripción etiquetada.</p>
+      </div>
+    </section>
+    <p id="status" class="status-message" role="status" aria-live="polite" hidden></p>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

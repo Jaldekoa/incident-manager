@@ -1,66 +1,33 @@
 import { ollama, KEEP_ALIVE } from './ollama.js';
+import { getSettings, populateModelSelects } from './settings.js';
+import { $, createStatus } from './ui.js';
 
-const $ = (selector) => document.querySelector(selector);
-const statusEl = $('#status');
 const preloadButton = $('#preload');
 const clearButton = $('#clear');
+const settingsButton = $('#settings');
 const captureToggle = $('#capture-toggle');
 const modelSelect = $('#model');
 const transcriptEl = $('#transcript');
 const summaryModelSelect = $('#summary-model');
 const summarizeButton = $('#summarize');
 const summaryEl = $('#summary');
+const status = createStatus($('#status'));
 
-const ASR_HINT = 'qwen3-asr';
-const SUMMARY_PROMPT = 'Eres asistente de un servicio técnico de call center. Resume únicamente lo que comunica el cliente en la transcripción. Escribe en español, de forma breve, clara y útil para que el agente pueda gestionar el caso. Incluye, cuando aparezcan: motivo de contacto, producto o servicio afectado, problema y síntomas, cuándo ocurre, mensajes de error, pasos que el cliente ya probó, impacto o urgencia, y resultado o petición del cliente. No inventes datos ni presentes suposiciones como hechos. Si falta un dato importante, indícalo como pendiente de confirmar. Omite saludos, repeticiones y conversación irrelevante. Devuelve solo el resumen en viñetas, sin introducción.';
 const COPY_SOURCES = {
   transcript: [transcriptEl, 'Transcripción copiada.'],
   summary: [summaryEl, 'Resumen copiado.']
 };
-
-/** Muestra un mensaje en la barra de estado; un texto vacío la oculta. */
-function status(text = '', error = false) {
-  statusEl.textContent = text;
-  statusEl.hidden = !text;
-  statusEl.classList.toggle('error', error);
-}
 
 function setCaptureToggle(capturing) {
   captureToggle.querySelector('span:last-child').textContent = capturing ? 'Detener captura' : 'Comenzar captura';
   captureToggle.classList.toggle('stop', capturing);
 }
 
-// ---- Modelos ----
-
-const isAsrModel = (name) => name.toLowerCase().includes(ASR_HINT);
-const pickModel = (models, saved, matches) => (models.includes(saved) ? saved : models.find(matches) || models[0]);
-
-function fillSelect(select, models, selected) {
-  select.replaceChildren(...models.map((name) => new Option(name, name)));
-  select.value = selected;
-  return selected;
-}
-
 async function loadInstalledModels() {
-  const showPlaceholder = (text) => [modelSelect, summaryModelSelect].forEach((select) => select.replaceChildren(new Option(text, '')));
   try {
-    const [saved, { models: installed = [] }] = await Promise.all([
-      chrome.storage.local.get(['model', 'summaryModel']),
-      ollama('/api/tags')
-    ]);
-    const models = installed.map((item) => item.name || item.model).filter(Boolean);
-    if (!models.length) {
-      showPlaceholder('No hay modelos instalados');
-      status('No hay modelos instalados en Ollama.', true);
-      return;
-    }
-    await chrome.storage.local.set({
-      model: fillSelect(modelSelect, models, pickModel(models, saved.model, isAsrModel)),
-      summaryModel: fillSelect(summaryModelSelect, models, pickModel(models, saved.summaryModel, (name) => !isAsrModel(name)))
-    });
+    await chrome.storage.local.set(await populateModelSelects(modelSelect, summaryModelSelect, await getSettings()));
   } catch (error) {
-    showPlaceholder('No se pudo leer Ollama');
-    status(`No se pudieron cargar los modelos instalados: ${error.message}`, true);
+    status(error.message, true);
   }
 }
 
@@ -103,10 +70,12 @@ chrome.runtime.onMessage.addListener(({ type, error }) => {
 modelSelect.addEventListener('change', () => chrome.storage.local.set({ model: modelSelect.value }));
 summaryModelSelect.addEventListener('change', () => chrome.storage.local.set({ summaryModel: summaryModelSelect.value }));
 
+settingsButton.addEventListener('click', () => chrome.runtime.openOptionsPage());
+
 clearButton.addEventListener('click', async () => {
   transcriptEl.value = '';
   summaryEl.value = '';
-  await chrome.storage.local.set({ transcript: '', lastSegment: '', summary: '' });
+  await chrome.storage.local.set({ transcript: '', lastSegments: {}, lastSpeaker: '', summary: '' });
 });
 
 preloadButton.addEventListener('click', () => {
@@ -140,13 +109,14 @@ summarizeButton.addEventListener('click', async () => {
   summarizeButton.disabled = true;
   status(`Generando resumen con ${model}…`);
   try {
+    const { summaryPrompt } = await getSettings();
     const { message } = await ollama('/api/chat', {
       body: {
         model,
         stream: false,
         keep_alive: KEEP_ALIVE,
         messages: [
-          { role: 'system', content: SUMMARY_PROMPT },
+          { role: 'system', content: summaryPrompt },
           { role: 'user', content: `Resume esta transcripción de una llamada de soporte técnico:\n\n${transcript}` }
         ]
       }

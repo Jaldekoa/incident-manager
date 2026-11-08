@@ -1,14 +1,14 @@
 import { ollama, DEFAULT_ASR_MODEL, KEEP_ALIVE } from './ollama.js';
+import { DEFAULT_ASR_PROMPT, SPEAKERS } from './settings.js';
 
 const TARGET_RATE = 16000;
 const WINDOW_SECONDS = 4;
 const STRIDE_SECONDS = 3; // 1 s de solape entre ventanas
+const SILENCE_RMS = 0.005; // por debajo, la ventana se considera silencio y no se envía al ASR
 const ASR_TAG = '<asr_text>';
+const MIC_CONSTRAINTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
 
-let tabStream;
-let audioContext;
-let sourceNode;
-let processorNode;
+let session; // { context, streams, ports } de la captura activa
 let activeRequest;
 let captureGeneration = 0;
 let captureControl = Promise.resolve();
@@ -23,6 +23,15 @@ function enqueueCaptureOperation(operation) {
   captureControl = result.catch(() => {});
   return result;
 }
+
+async function getAsrSettings() {
+  const { model = DEFAULT_ASR_MODEL, asrPrompt = DEFAULT_ASR_PROMPT } = (await report({ type: 'GET_SETTINGS' })) || {};
+  return { model, asrPrompt };
+}
+
+const preloadModel = (model) => ollama('/api/generate', { body: { model, prompt: '', keep_alive: KEEP_ALIVE, stream: false } });
+
+// ---- Audio → WAV ----
 
 /** Remuestrea a 16 kHz mono y devuelve los bytes de un WAV PCM16. */
 function wavFromPcm(input, sourceRate) {
@@ -49,8 +58,16 @@ function toBase64(bytes) {
   return btoa(binary);
 }
 
-async function transcribe(wav, generation) {
-  const { model = DEFAULT_ASR_MODEL } = (await report({ type: 'GET_SETTINGS' })) || {};
+function rms(samples) {
+  let sum = 0;
+  for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i];
+  return Math.sqrt(sum / samples.length);
+}
+
+// ---- Transcripción ----
+
+async function transcribe(wav, speaker, generation) {
+  const { model, asrPrompt } = await getAsrSettings();
   if (!isCurrent(generation)) return;
   const controller = new AbortController();
   activeRequest = controller;
@@ -58,7 +75,7 @@ async function transcribe(wav, generation) {
   try {
     const { message } = await ollama('/api/chat', {
       signal: controller.signal,
-      body: { model, stream: false, keep_alive: KEEP_ALIVE, messages: [{ role: 'user', content: `language Spanish${ASR_TAG}`, images: [toBase64(wav)] }] }
+      body: { model, stream: false, keep_alive: KEEP_ALIVE, messages: [{ role: 'user', content: asrPrompt, images: [toBase64(wav)] }] }
     });
     raw = message?.content || '';
   } finally {
@@ -66,36 +83,29 @@ async function transcribe(wav, generation) {
   }
   const tagIndex = raw.indexOf(ASR_TAG);
   const text = (tagIndex >= 0 ? raw.slice(tagIndex + ASR_TAG.length) : raw).replace(/<\|[^|]+\|>/g, '').trim();
-  if (text && isCurrent(generation)) await report({ type: 'APPEND_TRANSCRIPT', text });
+  if (text && isCurrent(generation)) await report({ type: 'APPEND_TRANSCRIPT', speaker, text });
 }
 
-function queueWindow(samples, sampleRate, generation) {
+/** Encola una ventana de audio; ambas fuentes comparten cola para mantener el orden cronológico. */
+function queueWindow(samples, sampleRate, speaker, generation) {
+  if (rms(samples) < SILENCE_RMS) return;
   const wav = wavFromPcm(samples, sampleRate);
   transcriptQueue = transcriptQueue
-    .then(() => isCurrent(generation) && transcribe(wav, generation))
+    .then(() => isCurrent(generation) && transcribe(wav, speaker, generation))
     .catch((error) => {
       if (isCurrent(generation)) report({ type: 'CAPTURE_STATE', capturing: true, error: error.message });
     });
 }
 
-/** Acumula audio en un buffer circular y emite una ventana de 4 s cada 3 s. */
-function beginContinuousAudioCapture() {
-  const { sampleRate } = audioContext;
-  const generation = captureGeneration;
+/** Acumula audio en un buffer circular y llama a `onWindow` con una ventana de 4 s cada 3 s. */
+function createWindower(sampleRate, onWindow) {
   const windowSamples = Math.ceil(sampleRate * WINDOW_SECONDS);
   const strideSamples = Math.ceil(sampleRate * STRIDE_SECONDS);
   const ring = new Float32Array(windowSamples);
   let writeIndex = 0;
   let buffered = 0;
   let sinceWindow = 0;
-
-  processorNode = new AudioWorkletNode(audioContext, 'tab-audio-capture', {
-    numberOfInputs: 1,
-    numberOfOutputs: 1,
-    outputChannelCount: [2]
-  });
-  processorNode.port.onmessage = ({ data: input }) => {
-    if (!isCurrent(generation)) return;
+  return (input) => {
     for (let i = 0; i < input.length; i++) {
       ring[writeIndex] = input[i];
       writeIndex = (writeIndex + 1) % windowSamples;
@@ -107,51 +117,83 @@ function beginContinuousAudioCapture() {
     const chronological = new Float32Array(windowSamples);
     chronological.set(ring.subarray(writeIndex), 0);
     chronological.set(ring.subarray(0, writeIndex), windowSamples - writeIndex);
-    queueWindow(chronological, sampleRate, generation);
+    onWindow(chronological);
   };
-  sourceNode = audioContext.createMediaStreamSource(tabStream);
-  sourceNode.connect(processorNode);
-  processorNode.connect(audioContext.destination); // mantiene el audio de la pestaña audible
 }
+
+/** Conecta un stream al worklet de captura y etiqueta sus ventanas con `speaker`. */
+function attachSource(stream, speaker, output) {
+  const { context, generation } = session;
+  const processor = new AudioWorkletNode(context, 'tab-audio-capture', {
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    outputChannelCount: [2]
+  });
+  const collect = createWindower(context.sampleRate, (samples) => queueWindow(samples, context.sampleRate, speaker, generation));
+  processor.port.onmessage = ({ data }) => { if (isCurrent(generation)) collect(data); };
+  context.createMediaStreamSource(stream).connect(processor);
+  processor.connect(output);
+  session.ports.push(processor.port);
+}
+
+/** Añade el micrófono del agente. Devuelve un mensaje de error si no está disponible (la captura sigue sin él). */
+async function attachMicrophone() {
+  try {
+    const micStream = await navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS, video: false });
+    session.streams.push(micStream);
+    const muted = session.context.createGain(); // el micro se procesa pero no se reproduce (evita realimentación)
+    muted.gain.value = 0;
+    muted.connect(session.context.destination);
+    attachSource(micStream, SPEAKERS.agent, muted);
+    return undefined;
+  } catch (error) {
+    return `Sin audio del agente: no se pudo acceder al micrófono (${error.message}). Concede el permiso en Configuración.`;
+  }
+}
+
+// ---- Ciclo de vida de la captura ----
 
 async function startCapture(streamId) {
   await stopCapture(false);
   const generation = ++captureGeneration;
-  tabStream = await navigator.mediaDevices.getUserMedia({
-    audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId } }, video: false
-  });
-  audioContext = new AudioContext();
-  await audioContext.resume();
-  await audioContext.audioWorklet.addModule(chrome.runtime.getURL('capture-worklet.js'));
-  beginContinuousAudioCapture();
-  tabStream.getTracks().forEach((track) => track.addEventListener('ended', () => {
-    if (tabStream && isCurrent(generation)) stopCapture();
-  }, { once: true }));
-  await report({ type: 'CAPTURE_STATE', capturing: true });
+  const { model } = await getAsrSettings();
+  preloadModel(model).catch(() => {}); // precalienta el ASR mientras se llena la primera ventana
+  try {
+    const context = new AudioContext();
+    session = { context, generation, streams: [], ports: [] };
+    const tabStream = await navigator.mediaDevices.getUserMedia({
+      audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId } }, video: false
+    });
+    session.streams.push(tabStream);
+    await context.resume();
+    await context.audioWorklet.addModule(chrome.runtime.getURL('capture-worklet.js'));
+    attachSource(tabStream, SPEAKERS.user, context.destination); // el audio de la pestaña sigue sonando
+    const micError = await attachMicrophone();
+    tabStream.getTracks().forEach((track) => track.addEventListener('ended', () => {
+      if (isCurrent(generation)) enqueueCaptureOperation(() => stopCapture());
+    }, { once: true }));
+    await report({ type: 'CAPTURE_STATE', capturing: true, error: micError });
+  } catch (error) {
+    await stopCapture(false);
+    throw error;
+  }
 }
 
 async function stopCapture(updateState = true) {
   captureGeneration++;
   activeRequest?.abort();
   activeRequest = undefined;
-  if (processorNode) {
-    processorNode.port.onmessage = null;
-    processorNode.port.close();
-    processorNode.disconnect();
+  const current = session;
+  session = undefined;
+  if (current) {
+    current.ports.forEach((port) => { port.onmessage = null; port.close(); });
+    current.streams.forEach((stream) => stream.getTracks().forEach((track) => track.stop()));
+    await current.context.close().catch(() => {});
   }
-  sourceNode?.disconnect();
-  tabStream?.getTracks().forEach((track) => track.stop());
-  const context = audioContext;
-  processorNode = sourceNode = tabStream = audioContext = undefined;
-  await context?.close().catch(() => {});
   if (updateState) await report({ type: 'CAPTURE_STATE', capturing: false });
 }
 
-function preloadModel(model) {
-  ollama('/api/generate', { body: { model, prompt: '', keep_alive: KEEP_ALIVE, stream: false } })
-    .then(() => chrome.runtime.sendMessage({ type: 'PRELOAD_DONE' }))
-    .catch((error) => chrome.runtime.sendMessage({ type: 'PRELOAD_FAILED', error: error.message }));
-}
+// ---- Mensajería ----
 
 function respond(promise, sendResponse) {
   promise.then(() => sendResponse({ ok: true }), (error) => sendResponse({ ok: false, error: error.message }));
@@ -161,6 +203,9 @@ function respond(promise, sendResponse) {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.target !== 'offscreen') return false;
   switch (message.type) {
+    case 'PING':
+      sendResponse({ ok: true });
+      return false;
     case 'START_CAPTURE':
       return respond(enqueueCaptureOperation(() => startCapture(message.streamId)).catch(async (error) => {
         await report({ type: 'CAPTURE_STATE', capturing: false, error: error.message });
@@ -169,7 +214,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     case 'STOP_CAPTURE':
       return respond(enqueueCaptureOperation(() => stopCapture()), sendResponse);
     case 'PRELOAD_MODEL':
-      preloadModel(message.model);
+      preloadModel(message.model)
+        .then(() => chrome.runtime.sendMessage({ type: 'PRELOAD_DONE' }))
+        .catch((error) => chrome.runtime.sendMessage({ type: 'PRELOAD_FAILED', error: error.message }));
       return false;
   }
   return false;

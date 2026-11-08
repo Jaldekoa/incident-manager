@@ -1,19 +1,29 @@
-import { DEFAULT_ASR_MODEL } from './ollama.js';
+import { getSettings, SPEAKERS } from './settings.js';
 
 const RESTRICTED_URL = /^(chrome|edge|about|chrome-extension):/i;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function hasOffscreen() {
   const contexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
   return contexts.length > 0;
 }
 
+/** Crea el documento offscreen si no existe y espera a que su listener responda (los módulos cargan diferidos). */
 async function ensureOffscreen() {
-  if (await hasOffscreen()) return;
-  await chrome.offscreen.createDocument({
-    url: 'offscreen.html',
-    reasons: ['USER_MEDIA', 'AUDIO_PLAYBACK'],
-    justification: 'Capturar audio de pestaña, reproducirlo localmente y transcribirlo sin mostrar una ventana.'
-  });
+  if (!(await hasOffscreen())) {
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: ['USER_MEDIA', 'AUDIO_PLAYBACK'],
+      justification: 'Capturar audio de pestaña y micrófono, reproducirlo localmente y transcribirlo sin mostrar una ventana.'
+    });
+  }
+  for (let attempt = 0; attempt < 50; attempt++) {
+    try {
+      if ((await chrome.runtime.sendMessage({ target: 'offscreen', type: 'PING' }))?.ok) return;
+    } catch { /* Aún no hay receptor. */ }
+    await sleep(50);
+  }
+  throw new Error('El documento de captura no respondió.');
 }
 
 /** Persiste el estado de captura y lo refleja en el icono. `error` solo se escribe si se indica. */
@@ -28,18 +38,30 @@ async function setCaptureState(capturing, error) {
 const splitWords = (text) => text.trim().split(/\s+/).filter(Boolean);
 const normalize = (word) => word.toLocaleLowerCase('es').replace(/[^\p{L}\p{N}]/gu, '');
 
-/** Añade `text` a la transcripción descartando las 2–10 palabras que se solapan con el segmento anterior. */
-function mergeTranscript(transcript, lastSegment, text) {
+/** Devuelve `text` sin las 2–10 primeras palabras que repiten el final de `lastSegment` (solape entre ventanas). */
+function removeOverlap(lastSegment, text) {
   const previous = splitWords(lastSegment).map(normalize);
   const incoming = splitWords(text);
   const incomingNorm = incoming.map(normalize);
-  let overlap = 0;
   for (let count = Math.min(10, previous.length, incoming.length); count >= 2; count--) {
-    if (previous.slice(-count).every((word, i) => word && word === incomingNorm[i])) { overlap = count; break; }
+    if (previous.slice(-count).every((word, i) => word && word === incomingNorm[i])) return incoming.slice(count).join(' ');
   }
-  const addition = incoming.slice(overlap).join(' ');
-  if (!addition) return transcript;
-  return transcript && !transcript.endsWith(' ') ? `${transcript} ${addition}` : transcript + addition;
+  return incoming.join(' ');
+}
+
+/**
+ * Añade un segmento de `speaker` a la transcripción. Si sigue hablando la misma persona se continúa su línea;
+ * si no, se abre una línea nueva con la etiqueta `[AGENTE]` o `[USUARIO]`.
+ */
+function appendSegment({ transcript = '', lastSegments = {}, lastSpeaker = '' }, speaker, text) {
+  const addition = removeOverlap(lastSegments[speaker] || '', text);
+  const nextSegments = { ...lastSegments, [speaker]: text.trim() };
+  if (!addition) return { transcript, lastSegments: nextSegments, lastSpeaker };
+  const continues = transcript && speaker === lastSpeaker;
+  const next = continues
+    ? `${transcript}${/\s$/.test(transcript) ? '' : ' '}${addition}`
+    : `${transcript}${transcript ? '\n' : ''}[${speaker}] ${addition}`;
+  return { transcript: next, lastSegments: nextSegments, lastSpeaker: speaker };
 }
 
 async function startCaptureForTab(tab) {
@@ -49,7 +71,7 @@ async function startCaptureForTab(tab) {
   await ensureOffscreen();
   const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
   await chrome.storage.session.set({ capturing: false, lastError: '' });
-  await chrome.storage.local.set({ lastSegment: '' });
+  await chrome.storage.local.set({ lastSegments: {}, lastSpeaker: '' });
   const result = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'START_CAPTURE', streamId });
   if (!result?.ok) throw new Error(result?.error || 'No se pudo iniciar la captura.');
 }
@@ -74,12 +96,13 @@ const handlers = {
     return OK;
   },
   async GET_SETTINGS() {
-    const { model } = await chrome.storage.local.get('model');
-    return { model: model || DEFAULT_ASR_MODEL };
+    const { model, asrPrompt } = await getSettings();
+    return { model, asrPrompt };
   },
-  async APPEND_TRANSCRIPT({ text }) {
-    const { transcript = '', lastSegment = '' } = await chrome.storage.local.get(['transcript', 'lastSegment']);
-    await chrome.storage.local.set({ transcript: mergeTranscript(transcript, lastSegment, text), lastSegment: text.trim() });
+  async APPEND_TRANSCRIPT({ speaker, text }) {
+    if (!Object.values(SPEAKERS).includes(speaker)) throw new Error(`Hablante desconocido: ${speaker}`);
+    const state = await chrome.storage.local.get(['transcript', 'lastSegments', 'lastSpeaker']);
+    await chrome.storage.local.set(appendSegment(state, speaker, text));
     return OK;
   },
   async CAPTURE_STATE({ capturing, error }) {

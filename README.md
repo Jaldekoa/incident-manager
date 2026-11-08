@@ -1,6 +1,6 @@
 # Transcripción local de llamadas
 
-Extensión de Chrome para transcribir en español el audio de una pestaña web con Ollama local. Solo captura audio de pestaña; el audio sigue sonando mientras se captura. No escribe grabaciones en disco.
+Extensión de Chrome para transcribir en español el audio de una pestaña web con Ollama local. Captura dos fuentes: el audio de la pestaña de la llamada (el **usuario**) y el micrófono del **agente**; el audio de la pestaña sigue sonando mientras se captura. No escribe grabaciones en disco.
 
 ## Modelo
 
@@ -25,10 +25,20 @@ El panel consulta Ollama y muestra los modelos que ya tienes instalados. Elige `
 3. Puedes cambiar a otra pestaña o ventana: la captura continúa en segundo plano. Vuelve al popup y pulsa **Detener captura** cuando termine la llamada. El distintivo **REC** indica que sigue activa; también se puede detener desde el menú contextual del icono.
 4. Pulsa **Generar resumen** para resumir la conversación con el modelo de texto seleccionado. Los botones **Copiar** copian la transcripción o el resumen.
 
-La captura usa ventanas continuas de cuatro segundos con un segundo de solape para reducir palabras perdidas entre fragmentos. El texto se añade sin etiqueta de hablante y se eliminan repeticiones detectadas en el solape. La primera petición después de descargar el modelo o de que Ollama lo descargue de memoria puede tardar más; precargarlo reduce esa demora.
+Cada intervención se etiqueta como `[USUARIO]` (audio de la pestaña) o `[AGENTE]` (micrófono), en una línea nueva cada vez que cambia el hablante. Las ventanas en silencio no se envían al modelo. Usa auriculares para que el micrófono no recoja la voz del usuario.
+
+La captura usa ventanas continuas de cuatro segundos con un segundo de solape para reducir palabras perdidas entre fragmentos. Se eliminan las repeticiones detectadas en el solape de cada hablante. Al iniciar la captura el modelo STT se precalienta automáticamente; aun así, la primera petición tras descargar el modelo de memoria puede tardar más, y **Cargar modelo** reduce esa demora.
+
+## Configuración
+
+El botón del engranaje (arriba a la derecha) abre la página de configuración, donde puedes:
+
+- Elegir el modelo STT y el modelo LLM del resumen.
+- Editar el prompt de cada sección (o restaurar los valores por defecto).
+- Conceder el permiso de micrófono a la extensión. **Es necesario hacerlo una vez** para que se transcriba al agente; sin él solo se transcribe al usuario.
 
 ## Resumen de la llamada
 
-Debajo de la transcripción, elige un modelo de texto instalado en Ollama y pulsa **Generar resumen** cuando quieras resumir lo dicho por el cliente. El resumen prioriza el motivo de contacto, el producto o servicio afectado, síntomas, errores, pruebas realizadas, impacto/urgencia y petición del cliente; señala los datos importantes que falten y no debe inventar información. Puedes editar o copiar el resultado desde el cuadro de resumen. El botón **Limpiar sesión** (papelera, arriba) limpia tanto la transcripción como el resumen.
+Debajo de la transcripción, elige un modelo de texto instalado en Ollama y pulsa **Generar resumen** cuando quieras resumir la conversación. Gracias a las etiquetas, el resumen reconstruye quién dice qué: motivo de contacto, producto o servicio afectado, síntomas, errores, pasos indicados por el agente y respuestas del usuario, solución o próximos pasos e impacto/urgencia; señala los datos importantes que falten y no debe inventar información. Puedes editar o copiar el resultado desde el cuadro de resumen. El botón **Limpiar sesión** (papelera, arriba) limpia tanto la transcripción como el resumen.
 
 Tanto la transcripción como el resumen se procesan en `http://127.0.0.1:11434`; no se envían a servicios externos.
