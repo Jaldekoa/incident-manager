@@ -1,5 +1,7 @@
 import { ollama, KEEP_ALIVE } from './ollama.js';
 import { getSettings, populateModelSelects, isCapturableUrl, LANGUAGES, DEFAULT_SUMMARY_PROMPT } from './settings.js';
+import { categorize } from './categorize.js';
+import { createCategoryTree } from './category-tree.js';
 import { $, createStatus } from './ui.js';
 
 const status = createStatus($('#status'));
@@ -13,17 +15,24 @@ const captureToggle = $('#capture-toggle');
 const transcriptEl = $('#transcript');
 const summarizeButton = $('#summarize');
 const summaryEl = $('#summary');
+const categorizeButton = $('#categorize');
+// Una selección manual en el árbol se guarda como la categoría de la llamada.
+const categoryTree = createCategoryTree($('#category'), { onSelect: (category) => chrome.storage.local.set({ category }) });
 
 // Vista de configuración
 const settingsView = $('#settings-view');
-const modelSelect = $('#model');
 const languageSelect = $('#language');
-const summaryModelSelect = $('#summary-model');
 const summaryPromptEl = $('#summary-prompt');
+const MODEL_SELECTS = {
+  model: $('#model'),
+  summaryModel: $('#summary-model'),
+  categoryModel: $('#category-model')
+};
 
 const COPY_SOURCES = {
   transcript: [transcriptEl, 'Transcripción copiada.'],
-  summary: [summaryEl, 'Resumen copiado.']
+  summary: [summaryEl, 'Resumen copiado.'],
+  category: [categoryTree, 'Categoría copiada.']
 };
 
 const MIC_TITLES = {
@@ -53,8 +62,8 @@ async function refreshTabSource() {
   ]);
   const ok = Boolean(capturing) || isCapturableUrl(tab?.url);
   setSource(tabSource, ok, ok
-    ? 'Audio de la pestaña disponible: se transcribe como [USUARIO].'
-    : 'Esta pestaña no se puede capturar: abre la llamada en una página web normal.');
+    ? 'Audio de la pestaña disponible.'
+    : 'Esta pestaña no se puede capturar.');
 }
 
 function renderMicState(state) {
@@ -85,7 +94,7 @@ async function initSettings() {
   languageSelect.replaceChildren(...Object.entries(LANGUAGES).map(([value, label]) => new Option(label, value)));
   const settings = await fillSettingsForm();
   try {
-    await chrome.storage.local.set(await populateModelSelects(modelSelect, summaryModelSelect, settings));
+    await chrome.storage.local.set(await populateModelSelects(MODEL_SELECTS, settings));
   } catch (error) {
     status(error.message, true);
   }
@@ -94,9 +103,8 @@ async function initSettings() {
 async function showSettings(visible) {
   if (visible) {
     // Descarta cambios sin guardar de una visita anterior.
-    const { model, summaryModel } = await fillSettingsForm();
-    if (model) modelSelect.value = model;
-    if (summaryModel) summaryModelSelect.value = summaryModel;
+    const settings = await fillSettingsForm();
+    for (const [key, select] of Object.entries(MODEL_SELECTS)) if (settings[key]) select.value = settings[key];
   }
   mainView.hidden = visible;
   settingsView.hidden = !visible;
@@ -105,9 +113,10 @@ async function showSettings(visible) {
 
 // ---- Estado inicial y sincronización ----
 
-chrome.storage.local.get(['transcript', 'summary'], ({ transcript = '', summary = '' }) => {
+chrome.storage.local.get(['transcript', 'summary', 'category'], ({ transcript = '', summary = '', category }) => {
   transcriptEl.value = transcript;
   summaryEl.value = summary;
+  categoryTree.setCategory(category);
 });
 
 chrome.storage.session.get(['capturing', 'lastError']).then(({ capturing, lastError }) => {
@@ -142,6 +151,8 @@ chrome.runtime.onMessage.addListener(({ type, error }) => {
 
 // ---- Acciones: vista principal ----
 
+tabSource.addEventListener('click', () => status(tabSource.title, !tabSource.classList.contains('ok')));
+
 micSource.addEventListener('click', () => {
   // Chrome no muestra la petición de permiso dentro del popup: se concede en una pestaña aparte.
   if (micGranted) status('Micrófono disponible.');
@@ -153,7 +164,8 @@ $('#open-settings').addEventListener('click', () => showSettings(true));
 $('#clear').addEventListener('click', async () => {
   transcriptEl.value = '';
   summaryEl.value = '';
-  await chrome.storage.local.set({ transcript: '', lastSegments: {}, lastSpeaker: '', summary: '' });
+  categoryTree.setCategory(null);
+  await chrome.storage.local.set({ transcript: '', lastSegments: {}, lastSpeaker: '', summary: '', category: null });
 });
 
 preloadButton.addEventListener('click', async () => {
@@ -211,6 +223,27 @@ summarizeButton.addEventListener('click', async () => {
   }
 });
 
+categorizeButton.addEventListener('click', async () => {
+  const summary = summaryEl.value.trim();
+  const { categoryModel: model } = await getSettings();
+  if (!summary) return status('Genera primero el resumen para poder categorizarlo.', true);
+  if (!model) return status('Elige un modelo decisional en Configuración.', true);
+
+  categorizeButton.disabled = true;
+  status(`Categorizando con ${model}…`);
+  try {
+    const category = await categorize(model, summary, (done, total) =>
+      status(`Categorizando con ${model}…${total > 1 ? ` (${done}/${total})` : ''}`));
+    categoryTree.setCategory(category);
+    await chrome.storage.local.set({ category });
+    status('Incidencia categorizada.');
+  } catch (error) {
+    status(`No se pudo categorizar: ${error.message}`, true);
+  } finally {
+    categorizeButton.disabled = false;
+  }
+});
+
 document.querySelectorAll('[data-copy]').forEach((button) => button.addEventListener('click', async () => {
   const [source, doneMessage] = COPY_SOURCES[button.dataset.copy];
   if (!source.value.trim()) return status('No hay texto para copiar.', true);
@@ -236,8 +269,7 @@ $('#save-settings').addEventListener('click', async () => {
     await chrome.storage.local.set({
       language: languageSelect.value,
       summaryPrompt: summaryPromptEl.value.trim(),
-      ...(modelSelect.value && { model: modelSelect.value }),
-      ...(summaryModelSelect.value && { summaryModel: summaryModelSelect.value })
+      ...Object.fromEntries(Object.entries(MODEL_SELECTS).filter(([, select]) => select.value).map(([key, select]) => [key, select.value]))
     });
     await fillSettingsForm(); // un prompt vacío vuelve al valor por defecto
     status('Configuración guardada.');

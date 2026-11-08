@@ -10,6 +10,12 @@ En PowerShell, descarga la variante rápida:
 ollama pull frozenlab/qwen3-asr:0.6b
 ```
 
+Para la categorización, descarga también el modelo decisional Tev1 (requiere Ollama 0.35 o posterior):
+
+```powershell
+ollama pull tev1
+```
+
 El panel consulta Ollama y muestra los modelos que ya tienes instalados. Elige `frozenlab/qwen3-asr:0.6b` para esta integración.
 
 ## Instalar
@@ -33,7 +39,7 @@ La captura usa ventanas continuas de cuatro segundos con un segundo de solape pa
 
 El botón del engranaje (arriba a la derecha) muestra la configuración dentro del propio popup; la flecha vuelve a la vista principal. Allí puedes:
 
-- Elegir el modelo STT y el modelo LLM del resumen.
+- Elegir el modelo STT, el modelo LLM del resumen y el modelo decisional de la categoría.
 - Elegir el idioma de la transcripción (Español o Inglés).
 - Editar el prompt del resumen (o restaurar el valor por defecto).
 
@@ -49,4 +55,14 @@ Si el micrófono está en rojo, púlsalo: se abre una pestaña para conceder el 
 
 Pulsa **Generar resumen** cuando quieras resumir la conversación. Gracias a las etiquetas, el resumen reconstruye quién dice qué: motivo de contacto, producto o servicio afectado, síntomas, errores, pasos indicados por el agente y respuestas del usuario, solución o próximos pasos e impacto/urgencia; señala los datos importantes que falten y no debe inventar información. Puedes editar o copiar el resultado desde el cuadro de resumen. El botón **Limpiar sesión** (papelera, arriba) limpia tanto la transcripción como el resumen.
 
-Tanto la transcripción como el resumen se procesan en `http://127.0.0.1:11434`; no se envían a servicios externos.
+## Categoría
+
+Con el resumen generado, pulsa **Categorizar** para clasificar la incidencia en el árbol de `categories.js`. Se usa el modelo decisional Tev1 a través del endpoint `/v1/systemone` de Ollama y se elige la categoría final con **mayor probabilidad conjunta**: P(área) × P(subgrupo | área) × … × P(categoría | padre). Para ello se hace una pregunta por cada nodo con varias opciones y se recorre el árbol completo, de modo que un área algo menos probable puede ganar si contiene una categoría claramente más probable. Los nodos con una sola opción no se consultan.
+
+El algoritmo escala con el árbol: los nodos con más de 24 opciones se dividen en bloques (con una opción "ninguna de las anteriores") que luego se renormalizan juntos, y las preguntas se reparten en varias peticiones si superan los límites de la API (64 preguntas o 64 KiB por petición).
+
+El resultado aparece en un selector jerárquico, deshabilitado hasta la primera categorización. Al abrirlo se ve el árbol completo: las ramas se despliegan con ▶, la rama elegida aparece abierta y cada opción evaluada por el modelo muestra a la derecha su probabilidad conjunta (las que no pasan por el modelo, sin porcentaje). Puedes elegir otra categoría a mano, y el botón de copiar copia la ruta seleccionada. Al pasar el cursor sobre una categoría se muestra su descripción.
+
+Para cambiar las categorías, edita `categories.js`: cada nodo lleva una `descripcion_global` y el resto de sus claves son hijos; un hijo de tipo texto es una categoría final con su descripción. El árbol puede tener cualquier profundidad y cualquier número de opciones por nodo.
+
+La transcripción, el resumen y la categorización se procesan en `http://127.0.0.1:11434`; no se envían a servicios externos.

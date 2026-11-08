@@ -12,7 +12,7 @@
     <div id="main-view">
       <header class="topbar split-topbar">
         <div class="source-status" aria-label="Fuentes de audio">
-          <span id="tab-source" class="source" role="img"><span class="source-dot"></span><span class="material-symbols-outlined">desktop_windows</span></span>
+          <button id="tab-source" class="source" type="button"><span class="source-dot"></span><span class="material-symbols-outlined">desktop_windows</span></button>
           <button id="mic-source" class="source" type="button"><span class="source-dot"></span><span class="material-symbols-outlined">mic</span></button>
         </div>
         <div class="header-actions">
@@ -42,6 +42,19 @@
         </div>
         <textarea id="summary" class="summary" placeholder="Genera un resumen con motivo, síntomas, errores y pasos ya probados…" spellcheck="false" aria-label="Resumen de la llamada"></textarea>
       </section>
+      <section class="panel">
+        <div class="section-heading">
+          <h2><span class="material-symbols-outlined">category</span> Categoría</h2>
+          <div class="summary-actions">
+            <button class="text-button icon-action" type="button" data-copy="category" title="Copiar categoría" aria-label="Copiar categoría"><span class="material-symbols-outlined">content_copy</span></button>
+            <button id="categorize" class="generate-button" type="button"><span class="material-symbols-outlined">label</span> Categorizar</button>
+          </div>
+        </div>
+        <div id="category" class="tree-select">
+          <button class="tree-select-trigger" type="button" aria-expanded="false" aria-label="Categoría de la incidencia" disabled><span class="tree-select-label"></span><span class="material-symbols-outlined">expand_more</span></button>
+          <div class="tree-select-panel" role="tree" hidden></div>
+        </div>
+      </section>
     </div>
 
     <div id="settings-view" hidden>
@@ -51,8 +64,8 @@
           <h1>Configuración</h1>
         </div>
         <div class="header-actions">
-          <button id="reset-prompt" class="outline-button header-button" type="button" title="Rellena el prompt de resumen con el valor por defecto">Restaurar prompt</button>
-          <button id="save-settings" class="generate-button header-button" type="button"><span class="material-symbols-outlined">save</span> Guardar</button>
+          <button id="reset-prompt" class="icon-button" type="button" title="Restaurar prompt por defecto" aria-label="Restaurar prompt por defecto"><span class="material-symbols-outlined">restart_alt</span></button>
+          <button id="save-settings" class="icon-button" type="button" title="Guardar configuración" aria-label="Guardar configuración"><span class="material-symbols-outlined">save</span></button>
         </div>
       </header>
 
@@ -80,6 +93,15 @@
         <div class="field">
           <label for="summary-prompt">Prompt de resumen</label>
           <textarea id="summary-prompt" class="prompt" spellcheck="false"></textarea>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="section-heading">
+          <h2><span class="material-symbols-outlined">category</span> Categoría</h2>
+        </div>
+        <div class="field">
+          <label for="category-model">Modelo decisional</label>
+          <select id="category-model"><option value="">Cargando modelos…</option></select>
         </div>
       </section>
     </div>

@@ -15,11 +15,12 @@ export const isCapturableUrl = (url) => Boolean(url) && !RESTRICTED_URL.test(url
 
 /** Configuración efectiva: lo guardado por el usuario o, si está vacío, el valor por defecto. */
 export async function getSettings() {
-  const saved = await chrome.storage.local.get(['model', 'summaryModel', 'language', 'summaryPrompt']);
+  const saved = await chrome.storage.local.get(['model', 'summaryModel', 'categoryModel', 'language', 'summaryPrompt']);
   const language = LANGUAGES[saved.language] ? saved.language : DEFAULT_LANGUAGE;
   return {
     model: saved.model || DEFAULT_ASR_MODEL,
     summaryModel: saved.summaryModel || '',
+    categoryModel: saved.categoryModel || '',
     language,
     asrPrompt: buildAsrPrompt(language),
     summaryPrompt: saved.summaryPrompt?.trim() || DEFAULT_SUMMARY_PROMPT
@@ -27,6 +28,15 @@ export async function getSettings() {
 }
 
 const isAsrModel = (name) => name.toLowerCase().includes('qwen3-asr');
+const isDecisionModel = (name) => name.toLowerCase().startsWith('tev1');
+
+/** Qué modelo se prefiere por defecto para cada rol si no hay uno guardado. */
+const MODEL_ROLES = {
+  model: isAsrModel,
+  summaryModel: (name) => !isAsrModel(name) && !isDecisionModel(name),
+  categoryModel: isDecisionModel
+};
+
 const pickModel = (models, saved, matches) => (models.includes(saved) ? saved : models.find(matches) || models[0]);
 
 function fillSelect(select, models, selected) {
@@ -36,11 +46,11 @@ function fillSelect(select, models, selected) {
 }
 
 /**
- * Rellena los selectores STT y LLM con los modelos instalados en Ollama.
- * Devuelve `{ model, summaryModel }` seleccionados; lanza un Error legible si no hay modelos.
+ * Rellena los selectores de modelos (`{ model, summaryModel, categoryModel }` → <select>) con los modelos
+ * instalados en Ollama. Devuelve los modelos seleccionados con las mismas claves; lanza un Error legible si no hay modelos.
  */
-export async function populateModelSelects(asrSelect, summarySelect, saved) {
-  const showPlaceholder = (text) => [asrSelect, summarySelect].forEach((select) => select.replaceChildren(new Option(text, '')));
+export async function populateModelSelects(selects, saved) {
+  const showPlaceholder = (text) => Object.values(selects).forEach((select) => select.replaceChildren(new Option(text, '')));
   let models;
   try {
     const { models: installed = [] } = await ollama('/api/tags');
@@ -53,8 +63,6 @@ export async function populateModelSelects(asrSelect, summarySelect, saved) {
     showPlaceholder('No hay modelos instalados');
     throw new Error('No hay modelos instalados en Ollama.');
   }
-  return {
-    model: fillSelect(asrSelect, models, pickModel(models, saved.model, isAsrModel)),
-    summaryModel: fillSelect(summarySelect, models, pickModel(models, saved.summaryModel, (name) => !isAsrModel(name)))
-  };
+  return Object.fromEntries(Object.entries(selects).map(([key, select]) =>
+    [key, fillSelect(select, models, pickModel(models, saved[key], MODEL_ROLES[key]))]));
 }
