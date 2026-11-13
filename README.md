@@ -37,13 +37,17 @@ Una extensión de Chrome que escucha la llamada, separa la voz del **usuario** y
 
 <table>
   <tr>
-    <td align="center" width="50%">
+    <td align="center" width="33%">
       <img src="public/screenshot-main.png" alt="Vista principal: transcripción etiquetada, resumen y categoría" />
       <br/><sub><b>Vista principal</b>: transcripción en vivo, resumen y categoría</sub>
     </td>
-    <td align="center" width="50%">
-      <img src="public/screenshot-settings.png" alt="Configuración: modelos, idioma, prompt y editor de categorías" />
-      <br/><sub><b>Configuración</b>: modelos, idioma, prompt y editor del árbol de categorías</sub>
+    <td align="center" width="33%">
+      <img src="public/screenshot-settings-1.png" alt="Configuración: modelos, idioma y prompt de resumen" />
+      <br/><sub><b>Configuración</b>: modelos, idioma y prompt de resumen</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="public/screenshot-settings-2.png" alt="Configuración: prompt de resumen y editor del árbol de categorías" />
+      <br/><sub><b>Configuración</b>: prompt de resumen y editor del árbol de categorías</sub>
     </td>
   </tr>
 </table>
