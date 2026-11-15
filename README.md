@@ -21,6 +21,10 @@ Una extensión de Chrome que escucha la llamada, separa la voz del **usuario** y
 
 <br/>
 
+<img src="public/social.jpg" alt="Banner descripción de Realista" height="260">
+  
+<br/>
+
 [Características](#-características) ·
 [Cómo funciona](#-cómo-funciona) ·
 [Arquitectura](#%EF%B8%8F-arquitectura) ·
